@@ -51,6 +51,8 @@ import { DetailedProfileView } from './src/components/DetailedProfileView';
 import { CentralBankView } from './src/components/CentralBankView';
 import { VisaStatusModal } from './src/components/Immigration/VisaStatusModal';
 
+const API_BASE_URL = 'https://takhta-api.wuwamconly21.workers.dev';
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#07060A' },
   centerView: { justifyContent: 'center', alignItems: 'center', padding: 16 },
@@ -138,45 +140,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shortcutText: { color: '#F3CE65', fontSize: 9, fontWeight: 'bold', marginTop: 4, textAlign: 'center' },
-  catalogItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#18141F',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2B2035',
-    marginBottom: 6,
-  },
-  catalogItemActive: { borderColor: '#F3CE65', backgroundColor: '#22192D' },
-  btnTravel: {
-    backgroundColor: '#1E1826',
-    borderWidth: 1,
-    borderColor: '#F3CE65',
-    borderRadius: 6,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  btnTravelTxt: { color: '#F3CE65', fontSize: 11, fontWeight: 'bold' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalBox: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#120F17',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F3CE65',
-    padding: 16,
-  },
 });
 
 type TabUtama =
@@ -265,9 +228,6 @@ export default function App() {
 
   const [senaraiKilang] = useState<AdvancedFactoryData[]>([]);
   const [selectedFactoryId] = useState<string | null>(null);
-  const [modalBinaKilang] = useState(false);
-  const [kilangDipilih] = useState<string>('Kilang Berlian');
-
   const [userPartyId, setUserPartyId] = useState<string | null>(null);
   const [detailedParties] = useState<DetailedParty[]>([]);
 
@@ -287,43 +247,44 @@ export default function App() {
     playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
-  // FUNGSI SYNC & UPSERT KE SUPABASE DENGAN ERROR CATCHING
+  // FUNGSI TARIK DATA DARI CLOUDFLARE WORKER D1
+  const fetchCloudflarePlayer = async (userId: string, defaultUsername: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/player?id=${userId}`);
+      const result = await response.json();
+      if (result.success && result.player) {
+        setNamaPemain(result.player.username || defaultUsername);
+        setWang(result.player.baki_wang ?? 1000);
+        setNilam(result.player.permata_nilam ?? 1500);
+        setTahap(result.player.tahap ?? 1);
+        setXp(result.player.xp ?? 0);
+        setHp(result.player.hp ?? 100);
+        if (result.player.wilayah_id) setWilayahSemasa(result.player.wilayah_id);
+      }
+    } catch (err) {
+      console.error('Gagal ambil data dari Cloudflare:', err);
+    }
+  };
+
+  // FUNGSI SIMPAN DATA TERUS KE CLOUDFLARE D1 WORKER
+  const saveToCloudflare = async (updatedFields: any) => {
+    if (!pemainId) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/player/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pemainId, ...updatedFields }),
+      });
+    } catch (err) {
+      console.error('Gagal simpan ke Cloudflare:', err);
+    }
+  };
+
   const syncUserData = async (user: any) => {
     if (user) {
-      console.log("ID Pemain Semasa:", user.id);
       setPemainId(user.id);
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      
-      if (data) {
-        setNamaPemain(data.username || 'Pendekar');
-        setWang(data.baki_wang ?? 1000);
-        setNilam(data.permata_nilam ?? 1500);
-        setTahap(data.tahap ?? 1);
-        setXp(data.xp ?? 0);
-        setHp(data.hp ?? 100);
-        if (data.wilayah_id) setWilayahSemasa(data.wilayah_id);
-      } else {
-        const newProfile = {
-          id: user.id,
-          username: user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar',
-          baki_wang: 1000,
-          permata_nilam: 1500,
-          tahap: 1,
-          xp: 0,
-          hp: 100,
-          wilayah_id: 'Kuala Lumpur',
-        };
-        const { error: upsertError } = await supabase.from('profiles').upsert([newProfile]);
-        if (upsertError) {
-          console.error('Ralat Upsert Profil:', upsertError.message);
-        }
-        setNamaPemain(newProfile.username);
-        setWang(1000);
-        setNilam(1500);
-        setTahap(1);
-        setXp(0);
-        setHp(100);
-      }
+      const defaultName = user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar';
+      await fetchCloudflarePlayer(user.id, defaultName);
     } else {
       setPemainId(null);
       setNamaPemain('Tetamu (Guest)');
@@ -343,7 +304,7 @@ export default function App() {
       return;
     }
     const newHp = Math.max(0, hp - 10);
-    const maxedLvl = Math.min(50, tahap);
+    const maxedLvl = Math.min(50, tahap); // Had tahap maks 50
     const result = LevelSystem.addXp(maxedLvl, xp, 50, wang + 1500);
     const newLevel = Math.min(50, result.newLevel);
     const newXp = result.newXp;
@@ -354,22 +315,15 @@ export default function App() {
     setXp(newXp);
     setWang(newGold);
 
-    if (pemainId) {
-      const { error } = await supabase.from('profiles').update({
-        tahap: newLevel,
-        xp: newXp,
-        baki_wang: newGold,
-        hp: newHp,
-      }).eq('id', pemainId);
+    // Simpan terus ke Cloudflare D1
+    await saveToCloudflare({
+      tahap: newLevel,
+      xp: newXp,
+      baki_wang: newGold,
+      hp: newHp,
+    });
 
-      if (error) {
-        console.error('Ralat Supabase Update:', error);
-        tunjukNotifikasi('Gagal Simpan', error.message);
-        return;
-      }
-    }
-
-    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM disimpan ke pangkalan data!');
+    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM disimpan ke Cloudflare D1!');
   };
 
   const handleSendTroops = async (campaignId: string, side: string) => {
@@ -389,20 +343,12 @@ export default function App() {
     setXp(newXp);
     setWang(newGold);
 
-    if (pemainId) {
-      const { error } = await supabase.from('profiles').update({
-        tahap: newLevel,
-        xp: newXp,
-        baki_wang: newGold,
-        hp: newHp,
-      }).eq('id', pemainId);
-
-      if (error) {
-        console.error('Ralat Supabase Update:', error);
-        tunjukNotifikasi('Gagal Simpan', error.message);
-        return;
-      }
-    }
+    await saveToCloudflare({
+      tahap: newLevel,
+      xp: newXp,
+      baki_wang: newGold,
+      hp: newHp,
+    });
 
     tunjukNotifikasi('Gempur Instant!', `Berjaya menyerang ${side}! (+150 EXP, +$2,500 RM)`);
   };
@@ -613,6 +559,7 @@ export default function App() {
                 <Text style={styles.sectionHeaderTitle}>KILANG & INDUSTRI WILAYAH</Text>
                 <Text style={styles.cardDesc}>Jumlah kilang beroperasi: {senaraiKilang.length}</Text>
               </View>
+              {/* Pembinaan kilang ditutup */}
               <TouchableOpacity style={[styles.btnMiniGold, { opacity: 0.5 }]} onPress={() => tunjukNotifikasi('Disekat', 'Pembinaan kilang baru ditutup.')}>
                 <Plus size={14} color="#07060A" />
                 <Text style={styles.btnMiniGoldText}>+ BINA KILANG (TUTUP)</Text>
@@ -729,7 +676,7 @@ export default function App() {
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'perniagaan' && styles.bottomNavItemActive]} onPress={() => setTabAktif('perniagaan')}>
           <Factory size={18} color={tabAktif === 'perniagaan' ? '#F3CE65' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'perniagaan' && styles.bottomNavItemActive]}>Kilang</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'perniagaan' && styles.bottomNavTextActive]}>Kilang</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'gudang' && styles.bottomNavItemActive]} onPress={() => setTabAktif('gudang')}>
@@ -739,7 +686,7 @@ export default function App() {
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'profil' && styles.bottomNavItemActive]} onPress={() => setTabAktif('profil')}>
           <User size={18} color={tabAktif === 'profil' ? '#F3CE65' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'profil' && styles.bottomNavItemActive]}>Profil</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'profil' && styles.bottomNavTextActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
 
