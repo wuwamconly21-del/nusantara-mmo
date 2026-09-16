@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -18,7 +17,6 @@ import {
   User,
   Menu,
   ChevronLeft,
-  Landmark,
   Plus,
   Package,
   Globe2,
@@ -26,17 +24,17 @@ import {
   Map as MapIcon,
   LogIn,
   LogOut,
-  FileText,
 } from 'lucide-react-native';
 import { supabase } from './supabase';
 import { AuthModal } from './src/components/AuthModal';
+import { ClassSelectionModal } from './src/components/ClassSelectionModal';
 import { SidebarMenu } from './src/components/SidebarMenu';
 import { PetaInteraktif } from './src/components/WorldMap/PetaInteraktif';
 
 import { StateGovernment, ElectionCycleState, PlayerWarehouse, AdvancedFactoryData, PoliticalPhase } from './src/types/politics';
 import { DetailedParty } from './src/types/party';
 import { PlayerDisciplines, PassiveTalents, ActiveStudySession } from './src/types/skills';
-import { StateCentralBank, BankShareAsset, PlayerBankLedger } from './src/types/banking';
+import { StateCentralBank, PlayerBankLedger } from './src/types/banking';
 import { DisciplineEngine } from './src/services/DisciplineEngine';
 import { LevelSystem } from './src/services/LevelSystem';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -100,7 +98,6 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 9, color: '#888', marginTop: 2 },
   goldSmall: { color: '#F59E0B', fontSize: 10, fontWeight: 'bold', marginTop: 2 },
   whiteBold: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
-  mutedSmall: { color: '#64748B', fontSize: 8, marginTop: 2 },
   bottomNav: {
     flexDirection: 'row',
     height: 56,
@@ -203,12 +200,12 @@ type TabUtama =
 export default function App() {
   const [sesi, setSesi] = useState<any>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [tabAktif, setTabAktif] = useState<TabUtama>('utama');
   const [drawerBuka, setDrawerBuka] = useState(false);
   const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
   const [memuatkan, setMemuatkan] = useState(true);
 
-  // In-Game Notification Toast System
   const [toast, setToast] = useState<{ visible: boolean; title: string; desc: string }>({
     visible: false,
     title: '',
@@ -217,9 +214,7 @@ export default function App() {
 
   const tunjukNotifikasi = (title: string, desc: string) => {
     setToast({ visible: true, title, desc });
-    setTimeout(() => {
-      setToast({ visible: false, title: '', desc: '' });
-    }, 3000);
+    setTimeout(() => setToast({ visible: false, title: '', desc: '' }), 3000);
   };
 
   const [wilayahSemasa, setWilayahSemasa] = useState<string>('Kuala Lumpur');
@@ -243,7 +238,7 @@ export default function App() {
   });
 
   const [activeStudySession, setActiveStudySession] = useState<ActiveStudySession | null>(null);
-  const [passives, setPassives] = useState<PassiveTalents>({
+  const [passives] = useState<PassiveTalents>({
     pengaruhDaulat: 0,
     pakarUpeti: 0,
     langkahPantas: 0,
@@ -255,24 +250,12 @@ export default function App() {
   });
   const [passivePoints, setPassivePoints] = useState<number>(0);
 
-  const [playerWarehouse, setPlayerWarehouse] = useState<PlayerWarehouse>({
-    BERLIAN: 0,
-    KULIT: 0,
-    EMAS: 0,
-    MINYAK: 0,
-    MINYAK_DITAPIS: 0,
-    NTE: 0,
-    BAUKSIT: 0,
-    KAYU_CENDANA: 0,
-    KOPI: 0,
-    GANDUM: 0,
+  const [playerWarehouse] = useState<PlayerWarehouse>({
+    BERLIAN: 0, KULIT: 0, EMAS: 0, MINYAK: 0, MINYAK_DITAPIS: 0, NTE: 0, BAUKSIT: 0, KAYU_CENDANA: 0, KOPI: 0, GANDUM: 0,
   });
 
   const [playerBarracks] = useState<PlayerBarracks>({
-    level: 1,
-    maxCapacity: 500,
-    units: { INFANTRI: 5, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 },
-    totalMilitaryPower: 50,
+    level: 1, maxCapacity: 500, units: { INFANTRI: 5, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 }, totalMilitaryPower: 50,
   });
 
   const [activeEventWar] = useState<CustomWarCampaign>({
@@ -288,7 +271,7 @@ export default function App() {
   });
 
   const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
-  const [selectedFactoryId, setSelectedFactoryId] = useState<string | null>(null);
+  const [selectedFactoryId] = useState<string | null>(null);
   const [modalBinaKilang, setModalBinaKilang] = useState(false);
   const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
 
@@ -296,60 +279,33 @@ export default function App() {
   const [detailedParties] = useState<DetailedParty[]>([]);
 
   const [putrajayaGov] = useState<StateGovernment>({
-    stateCode: 'Putrajaya_MY',
-    stateName: 'Federation of Mahawangsa',
-    regimeType: 'DEMOKRASI_PARLIMEN',
-    totalSeats: 50,
-    rulingPartyId: '',
-    rulingPartyName: 'Tiada',
-    rulingLeaderId: '',
-    rulingLeaderName: 'Tiada',
-    rulingLeaderTitle: 'Tiada',
-    themeColor: '#F3CE65',
-    treasuryGold: 100000,
-    taxRatePercent: 5,
-    isEstablished: true,
-    populationCount: 1500,
-    resources: { BERLIAN: 10, KULIT: 50, EMAS: 200, MINYAK: 500, MINYAK_DITAPIS: 100, NTE: 0, BAUKSIT: 0, KAYU_CENDANA: 0, KOPI: 0, GANDUM: 0 },
-    activeBills: [],
-    controlledTerritories: ['Kuala Lumpur'],
+    stateCode: 'Putrajaya_MY', stateName: 'Federation of Mahawangsa', regimeType: 'DEMOKRASI_PARLIMEN', totalSeats: 50, rulingPartyId: '', rulingPartyName: 'Tiada', rulingLeaderId: '', rulingLeaderName: 'Tiada', rulingLeaderTitle: 'Tiada', themeColor: '#F3CE65', treasuryGold: 100000, taxRatePercent: 5, isEstablished: true, populationCount: 1500, resources: { BERLIAN: 10, KULIT: 50, EMAS: 200, MINYAK: 500, MINYAK_DITAPIS: 100, NTE: 0, BAUKSIT: 0, KAYU_CENDANA: 0, KOPI: 0, GANDUM: 0 }, activeBills: [], controlledTerritories: ['Kuala Lumpur'],
   });
 
   const [putrajayaElection] = useState<ElectionCycleState>({
-    stateCode: 'Putrajaya_MY',
-    phase: 'PEACE_TIME' as PoliticalPhase,
-    currentTerm: 1,
-    parties: [],
-    voterLedger: {},
-    nextDissolutionDate: '2026-10-01',
-    nextElectionDate: '2026-10-05',
+    stateCode: 'Putrajaya_MY', phase: 'PEACE_TIME' as PoliticalPhase, currentTerm: 1, parties: [], voterLedger: {}, nextDissolutionDate: '2026-10-01', nextElectionDate: '2026-10-05',
   });
 
   const [centralBank] = useState<StateCentralBank>({
-    stateCode: 'Putrajaya_MY',
-    stateName: 'Federation of Mahawangsa',
-    treasuryGold: 500000,
-    reserveGold: 1000000,
-    depositInterestRate: 3.0,
-    loanInterestRate: 6.0,
-    totalDepositedByPlayers: 0,
-    totalLoansIssued: 0,
-    isNationalized: true,
+    stateCode: 'Putrajaya_MY', stateName: 'Federation of Mahawangsa', treasuryGold: 500000, reserveGold: 1000000, depositInterestRate: 3.0, loanInterestRate: 6.0, totalDepositedByPlayers: 0, totalLoansIssued: 0, isNationalized: true,
   });
 
   const [playerBankLedger] = useState<PlayerBankLedger>({
-    playerId: 'PLAYER_01',
-    savingsBalance: 0,
-    activeLoanAmount: 0,
-    loanDueTimestamp: 0,
-    ownedShares: [],
+    playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
   const syncUserData = (user: any) => {
     if (user) {
       setPemainId(user.id);
-      const name = user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar';
-      setNamaPemain(name);
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+        if (data) {
+          setNamaPemain(data.username);
+          setWang(data.gold || 1000);
+          setTahap(data.level || 1);
+        } else {
+          setNamaPemain(user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar');
+        }
+      });
     } else {
       setPemainId(null);
       setNamaPemain('Tetamu (Guest)');
@@ -360,7 +316,7 @@ export default function App() {
     try { await supabase.auth.signOut(); } catch (e) {}
     setSesi(null);
     syncUserData(null);
-    tunjukNotifikasi('Log Keluar', 'Anda telah kembali ke status Tetamu.');
+    tunjukNotifikasi('Log Keluar', 'Anda kini bermain sebagai Tetamu.');
   };
 
   const handleWorkInFactory = () => {
@@ -373,23 +329,20 @@ export default function App() {
     setTahap(result.newLevel);
     setXp(result.newXp);
     setWang(result.newGold);
-    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM ditambah ke akaun!');
+    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM ditambah!');
   };
 
-  const handleSendTroops = (campaignId: string, side: string, power: number) => {
+  const handleSendTroops = (campaignId: string, side: string) => {
     if (hp < 15) {
       tunjukNotifikasi('Tenaga Kurang', 'Perlu 15 HP untuk menyerang!');
       return;
     }
     setHp((h) => Math.max(0, h - 15));
-    const expGained = 150;
-    const goldGained = 2500;
-    const result = LevelSystem.addXp(tahap, xp, expGained, wang + goldGained);
+    const result = LevelSystem.addXp(tahap, xp, 150, wang + 2500);
     setTahap(result.newLevel);
     setXp(result.newXp);
     setWang(result.newGold);
-
-    tunjukNotifikasi('Gempuran Berjaya!', `Menyerang ${side}! (+${expGained} EXP, +$${goldGained.toLocaleString()} RM).`);
+    tunjukNotifikasi('Gempur Instant!', `Berjaya menyerang ${side}! (+150 EXP, +$2,500 RM)`);
   };
 
   const handleStartStudy = (key: keyof PlayerDisciplines, method: 'WANG' | 'NILAM') => {
@@ -397,7 +350,6 @@ export default function App() {
       tunjukNotifikasi('Sedang Bertapa', 'Hanya 1 cabang ilmu boleh didalami pada satu-satu masa!');
       return;
     }
-
     const currentLvl = disciplines[key];
     const goldCost = DisciplineEngine.getGoldCost(currentLvl);
     const gemCost = DisciplineEngine.getGemsCost(currentLvl);
@@ -427,7 +379,6 @@ export default function App() {
       durationMs,
       endTime: now + durationMs,
     });
-
     tunjukNotifikasi('Mula Bertapa', `Latihan dimulakan! Baki masa: ${DisciplineEngine.formatTime(durationSecs)}.`);
   };
 
@@ -435,20 +386,16 @@ export default function App() {
     if (!activeStudySession) return;
     const key = activeStudySession.disciplineKey;
     const targetLvl = activeStudySession.targetLevel;
-
     setDisciplines((prev) => ({ ...prev, [key]: targetLvl }));
     setActiveStudySession(null);
     tunjukNotifikasi('Khatam Ilmu!', `Tahniah! ${key} meningkat ke Tahap ${targetLvl}!`);
   };
 
-  // PEMASA SKILL TIMER LATAR BELAKANG (PERKIRAAN SETIAP SAAT)
   useEffect(() => {
     const timer = setInterval(() => {
       if (activeStudySession) {
         const remaining = activeStudySession.endTime - Date.now();
-        if (remaining <= 0) {
-          handleCompleteStudy();
-        }
+        if (remaining <= 0) handleCompleteStudy();
       }
     }, 1000);
     return () => clearInterval(timer);
@@ -484,7 +431,6 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#07060A" />
 
-      {/* CUSTOM TOAST SYSTEM */}
       {toast.visible && (
         <View style={styles.toastBox}>
           <Text style={styles.toastTitle}>✨ {toast.title}</Text>
@@ -530,6 +476,7 @@ export default function App() {
         playerName={namaPemain}
         userGold={wang}
         userGems={nilam}
+        userIsLoggedIn={!!sesi}
         onNavigate={(screen: string) => {
           if (screen === 'MAP') setTabAktif('peta');
           if (screen === 'PARLIAMENT') setTabAktif('parlimen');
@@ -543,6 +490,8 @@ export default function App() {
           if (screen === 'VISA') setIsVisaModalOpen(true);
         }}
         onClose={() => setDrawerBuka(false)}
+        onLogKeluar={handleLogKeluar}
+        onLogMasuk={() => setIsAuthOpen(true)}
       />
 
       {tabAktif === 'utama' ? (
@@ -591,7 +540,7 @@ export default function App() {
           realWarCampaigns={[]}
           playerBarracks={playerBarracks}
           playerGold={wang}
-          onSendTroops={(cId, side, pwr) => handleSendTroops(cId, side, pwr)}
+          onSendTroops={(cId, side) => handleSendTroops(cId, side)}
           onOpenBarracks={() => setTabAktif('berek')}
         />
       ) : tabAktif === 'perniagaan' ? (
@@ -642,7 +591,7 @@ export default function App() {
             onStartStudy={handleStartStudy}
             onCompleteStudy={handleCompleteStudy}
             onCancelStudy={() => setActiveStudySession(null)}
-            onAllocatePassive={(key) => setPassivePoints((p) => Math.max(0, p - 1))}
+            onAllocatePassive={() => setPassivePoints((p) => Math.max(0, p - 1))}
           />
         </ScrollView>
       ) : tabAktif === 'parlimen' ? (
@@ -666,7 +615,7 @@ export default function App() {
         <ElectionsScreen
           {...({ election: putrajayaElection } as any)}
           userPartyId={userPartyId}
-          onCastVote={() => tunjukNotifikasi('Undi Diterima', 'Undian dimasukkan!')}
+          onCastVote={() => tunjukNotifikasi('Undi Diterima', 'Undian anda telah direkodkan!')}
           onBack={() => setTabAktif('utama')}
         />
       ) : tabAktif === 'bank' ? (
@@ -732,14 +681,25 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* AUTH POPUP MODAL */}
+      {/* AUTH & CLASS SELECTION MODAL */}
       <AuthModal
         visible={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onAuthSuccess={(user) => syncUserData(user)}
+        onAuthSuccess={(user, isNewUser) => {
+          syncUserData(user);
+          if (isNewUser) setIsClassModalOpen(true);
+        }}
       />
 
-      {/* BINA KILANG MODAL */}
+      <ClassSelectionModal
+        visible={isClassModalOpen}
+        onSelectClass={(className) => {
+          setIsClassModalOpen(false);
+          tunjukNotifikasi('Haluan Dipilih', `Selamat berjuang sebagai seorang ${className}!`);
+        }}
+      />
+
+      {/* MODAL BINA KILANG */}
       <Modal visible={modalBinaKilang} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalBox}>
