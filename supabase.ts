@@ -3,18 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Utamakan Environment Variables dari Cloudflare/Expo, atau fallback ke URL/Key hardcoded
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
+// URL & Key ditetapkan terus sebagai fallback sah supaya tidak crash jika process.env kosong
+const SUPABASE_URL = 
+  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) ||
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
   'https://quouvzuorkxnrlfkslne.supabase.co';
 
-const SUPABASE_ANON_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
+const SUPABASE_ANON_KEY = 
+  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) ||
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
   'sb_publishable_WpPZJEFRXQGfcn6X5SIvHA_7B8DoFFG';
 
-// Penyesuaian Storage untuk elak error AsyncStorage di pelayar web
 const CustomStorage = Platform.OS === 'web'
   ? {
       getItem: (key: string) => Promise.resolve(typeof window !== 'undefined' ? window.localStorage.getItem(key) : null),
@@ -23,7 +22,6 @@ const CustomStorage = Platform.OS === 'web'
     }
   : AsyncStorage;
 
-// Elak isu Duplicate Instance semasa Hot Reloading
 const globalRef = globalThis as unknown as { __supabaseInstance?: SupabaseClient };
 
 export const supabase: SupabaseClient =
