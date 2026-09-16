@@ -39,7 +39,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
     setLoading(true);
     try {
       if (isSignUp) {
-        // 1. Daftar akaun baru dalam Supabase Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -50,7 +49,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
 
         if (error) throw error;
 
-        // 2. Cipta profil pemain dalam database jika berjaya
         if (data.user) {
           await supabase.from('profiles').upsert([
             {
@@ -62,11 +60,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
           ]);
         }
 
-        notify('Pendaftaran Berjaya', 'Akaun anda telah dicipta! Mengakses permainan...');
+        notify('Pendaftaran Berjaya', 'Akaun dicipta! Selamat datang.');
         onAuthSuccess(data.user);
         onClose();
       } else {
-        // Log Masuk Akaun Sedia Ada
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -74,19 +71,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
 
         if (error) throw error;
 
-        notify('Selamat Kembali', `Log masuk berjaya!`);
+        notify('Selamat Kembali', 'Log masuk berjaya!');
         onAuthSuccess(data.user);
         onClose();
       }
     } catch (err: any) {
-      notify('Gagal', err.message || 'Ralat semasa log masuk/daftar.');
+      notify('Ralat Auth', err.message || 'Gagal untuk log masuk.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true}>
+    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>🏛️ NUSANTARA MMO</Text>
@@ -133,12 +130,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
 
           <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={{ marginTop: 14 }}>
             <Text style={styles.switchText}>
-              {isSignUp ? 'Dah ada akaun? Log Masuk di sini' : 'Belum ada akaun? Daftar Sekarang'}
+              {isSignUp ? 'Dah ada akaun? Log Masuk' : 'Belum ada akaun? Daftar Sekarang'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onClose} style={{ marginTop: 16 }}>
-            <Text style={styles.closeText}>Tutup (Teruskan Sebagai Tetamu)</Text>
+            <Text style={styles.closeText}>Tutup / Teruskan</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -153,6 +150,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    zIndex: 99999,
   },
   card: {
     width: '100%',
@@ -165,7 +163,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: { fontSize: 20, fontWeight: 'bold', color: '#F3CE65', marginBottom: 4 },
-  subtitle: { fontSize: 10, color: '#9CA3AF', marginBottom: 16, letterSpacing: 0.5 },
+  subtitle: { fontSize: 10, color: '#9CA3AF', marginBottom: 16 },
   input: {
     width: '100%',
     backgroundColor: '#18141F',
