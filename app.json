@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Takhta",
+    "slug": "takhta-mmo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#07060A",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Takhta",
+      "shortName": "Takhta",
+      "lang": "ms",
+      "themeColor": "#F3CE65",
+      "backgroundColor": "#07060A",
+      "description": "Geopolitik dan strategi kedaulatan Alam Melayu"
+    }
+  }
+}
