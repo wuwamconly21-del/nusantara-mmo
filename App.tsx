@@ -9,7 +9,6 @@ import {
   StatusBar,
   Modal,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -27,6 +26,9 @@ import {
   Map as MapIcon,
   LogIn,
   LogOut,
+  Landmark as BankIcon,
+  Shield,
+  FileText,
 } from 'lucide-react-native';
 import { supabase } from './supabase';
 import { AuthModal } from './src/components/AuthModal';
@@ -48,7 +50,7 @@ import { FactoryDetailView } from './src/components/FactoryDetailView';
 import { WarehouseView } from './src/components/WarehouseView';
 import { MILITARY_CATALOG, MilitaryUnitType, PlayerBarracks } from './src/types/military';
 import { WarHubView } from './src/components/WarHubView';
-import { CustomWarCampaign, WarType } from './src/types/military';
+import { CustomWarCampaign } from './src/types/military';
 import { DetailedProfileView } from './src/components/DetailedProfileView';
 import { CentralBankView } from './src/components/CentralBankView';
 import { VisaStatusModal } from './src/components/Immigration/VisaStatusModal';
@@ -114,82 +116,22 @@ const styles = StyleSheet.create({
   bottomNavItemActive: { borderTopWidth: 2, borderTopColor: '#F3CE65' },
   bottomNavText: { fontSize: 9, color: '#777', marginTop: 3 },
   bottomNavTextActive: { color: '#F3CE65', fontWeight: 'bold' },
-  avatarLetter: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#F3CE65',
-    backgroundColor: '#181320',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerName: { fontSize: 14, fontWeight: 'bold', color: '#FFF' },
-  playerSub: { fontSize: 10, color: '#F3CE65', marginTop: 1 },
-  btnMiniGold: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F3CE65',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  btnMiniGoldText: { color: '#07060A', fontSize: 9, fontWeight: 'bold' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalBox: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#120F17',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F3CE65',
-    padding: 16,
-  },
-  catalogItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#18141F',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2B2035',
-    marginBottom: 6,
-  },
-  catalogItemActive: { borderColor: '#F3CE65', backgroundColor: '#22192D' },
-  btnTravel: {
+  toastBox: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
     backgroundColor: '#1E1826',
-    borderWidth: 1,
     borderColor: '#F3CE65',
-    borderRadius: 6,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  btnTravelTxt: { color: '#F3CE65', fontSize: 11, fontWeight: 'bold' },
-  wilayahStatBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#130F1A',
-    borderRadius: 4,
-    paddingVertical: 8,
-    marginTop: 10,
     borderWidth: 1,
-    borderColor: '#22192D',
+    borderRadius: 8,
+    padding: 10,
+    zIndex: 9999,
+    alignItems: 'center',
   },
-  shortcutGrid: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
+  toastTitle: { color: '#F3CE65', fontSize: 11, fontWeight: 'bold' },
+  toastDesc: { color: '#FFF', fontSize: 10, marginTop: 2, textAlign: 'center' },
+  shortcutGrid: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   shortcutCard: {
     flex: 1,
     backgroundColor: '#120E1A',
@@ -200,13 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shortcutText: {
-    color: '#F3CE65',
-    fontSize: 9,
-    fontWeight: 'bold',
-    marginTop: 4,
-    textAlign: 'center',
-  },
+  shortcutText: { color: '#F3CE65', fontSize: 9, fontWeight: 'bold', marginTop: 4, textAlign: 'center' },
 });
 
 type TabUtama =
@@ -235,6 +171,20 @@ export default function App() {
   const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
   const [memuatkan, setMemuatkan] = useState(true);
 
+  // In-game Notification Toast
+  const [toast, setToast] = useState<{ visible: boolean; title: string; desc: string }>({
+    visible: false,
+    title: '',
+    desc: '',
+  });
+
+  const tunjukNotifikasi = (title: string, desc: string) => {
+    setToast({ visible: true, title, desc });
+    setTimeout(() => {
+      setToast({ visible: false, title: '', desc: '' });
+    }, 3000);
+  };
+
   const [wilayahSemasa, setWilayahSemasa] = useState<string>('Kuala Lumpur');
   const [negaraSemasa] = useState<string>('Federation of Mahawangsa');
   const [onlineCount] = useState<number>(1);
@@ -244,7 +194,7 @@ export default function App() {
   const [tahap, setTahap] = useState(1);
   const [xp, setXp] = useState(0);
   const [hp, setHp] = useState(100);
-  const [wang, setWang] = useState(1000);
+  const [wang, setWang] = useState(6050);
   const [nilam, setNilam] = useState(0);
   const [lastWorkTimestamp, setLastWorkTimestamp] = useState<number>(0);
 
@@ -282,21 +232,11 @@ export default function App() {
     GANDUM: 0,
   });
 
-  const calculateMilitaryPower = (units: Partial<Record<MilitaryUnitType, number>>, warSkill: number) => {
-    let basePower = 0;
-    (Object.keys(MILITARY_CATALOG) as MilitaryUnitType[]).forEach((uKey) => {
-      const qty = units[uKey] || 0;
-      basePower += qty * MILITARY_CATALOG[uKey].power;
-    });
-    const skillMultiplier = 1 + (warSkill * 0.5) / 100;
-    return Math.floor(basePower * skillMultiplier);
-  };
-
   const [playerBarracks, setPlayerBarracks] = useState<PlayerBarracks>({
     level: 1,
     maxCapacity: 500,
-    units: { INFANTRI: 0, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 },
-    totalMilitaryPower: 0,
+    units: { INFANTRI: 5, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 },
+    totalMilitaryPower: 50,
   });
 
   const [activeEventWar] = useState<CustomWarCampaign>({
@@ -314,10 +254,10 @@ export default function App() {
   const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState<string | null>(null);
   const [modalBinaKilang, setModalBinaKilang] = useState(false);
-  const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
+  const [kilangDipilih] = useState<string>('Kilang Berlian');
 
   const [userPartyId, setUserPartyId] = useState<string | null>(null);
-  const [detailedParties, setDetailedParties] = useState<DetailedParty[]>([]);
+  const [detailedParties] = useState<DetailedParty[]>([]);
 
   const [putrajayaGov] = useState<StateGovernment>({
     stateCode: 'Putrajaya_MY',
@@ -339,7 +279,7 @@ export default function App() {
     controlledTerritories: ['Kuala Lumpur'],
   });
 
-  const [putrajayaElection, setPutrajayaElection] = useState<ElectionCycleState>({
+  const [putrajayaElection] = useState<ElectionCycleState>({
     stateCode: 'Putrajaya_MY',
     phase: 'PEACE_TIME' as PoliticalPhase,
     currentTerm: 1,
@@ -369,11 +309,6 @@ export default function App() {
     ownedShares: [],
   });
 
-  const tunjukNotifikasi = (tajuk: string, mesej: string) => {
-    if (Platform.OS === 'web') window.alert(`${tajuk}: ${mesej}`);
-    else Alert.alert(tajuk, mesej);
-  };
-
   const syncUserData = (user: any) => {
     if (user) {
       setPemainId(user.id);
@@ -386,47 +321,39 @@ export default function App() {
   };
 
   const handleLogKeluar = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {}
+    try { await supabase.auth.signOut(); } catch (e) {}
     setSesi(null);
     syncUserData(null);
-    tunjukNotifikasi('Log Keluar', 'Anda telah log keluar.');
+    tunjukNotifikasi('Log Keluar', 'Anda telah kembali ke status Tetamu.');
   };
 
-  const handleWorkInFactory = (factoryId: string) => {
-    const WORK_COOLDOWN_MS = 10 * 60 * 1000;
-    const currentMs = Date.now();
-
-    if (currentMs - lastWorkTimestamp < WORK_COOLDOWN_MS) {
-      tunjukNotifikasi('Perlu Berehat', 'Sila tunggu masa rehat kilang tamat.');
-      return;
-    }
-
+  const handleWorkInFactory = () => {
     if (hp < 10) {
-      tunjukNotifikasi('Tenaga Lemah', 'Perlu 10 HP untuk bekerja!');
+      tunjukNotifikasi('Tenaga Lemah', 'Memerlukan sekurang-kurangnya 10 HP!');
       return;
     }
-
-    setLastWorkTimestamp(currentMs);
-    setHp((h) => h - 10);
-
-    const result = LevelSystem.addXp(tahap, xp, 45, wang + 4000);
+    setHp((h) => Math.max(0, h - 10));
+    const result = LevelSystem.addXp(tahap, xp, 50, wang + 1500);
     setTahap(result.newLevel);
     setXp(result.newXp);
     setWang(result.newGold);
-    tunjukNotifikasi('Kerja Selesai', '+45 EXP dan +$4,000 RM diperoleh!');
+    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM ditambah ke akaun!');
   };
 
-  const handleSendTroops = (campaignId: string, side: 'ATTACK' | 'DEFENSE', power: number) => {
-    const expGained = Math.floor(120 + disciplines.ilmuKetenteraan * 2.5);
-    const goldGained = Math.floor(5000 + disciplines.ilmuFirasat * 50);
+  const handleSendTroops = (campaignId: string, side: string, power: number) => {
+    if (hp < 15) {
+      tunjukNotifikasi('Tenaga Kurang', 'Perlu 15 HP untuk menyerang!');
+      return;
+    }
+    setHp((h) => Math.max(0, h - 15));
+    const expGained = 150;
+    const goldGained = 2500;
     const result = LevelSystem.addXp(tahap, xp, expGained, wang + goldGained);
     setTahap(result.newLevel);
     setXp(result.newXp);
     setWang(result.newGold);
 
-    tunjukNotifikasi('Gempuran Berjaya!', `Menyerang pihak ${side}! (+${expGained} EXP, +$${goldGained.toLocaleString()} RM).`);
+    tunjukNotifikasi('Gempuran Berjaya!', `Menyerang ${side}! (+${expGained} EXP, +$${goldGained.toLocaleString()} RM).`);
   };
 
   useEffect(() => {
@@ -441,9 +368,7 @@ export default function App() {
       syncUserData(session?.user);
     });
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   const currentRank = LevelSystem.getRankForLevel(tahap);
@@ -460,6 +385,14 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#07060A" />
+
+      {/* CUSTOM TOAST SYSTEM */}
+      {toast.visible && (
+        <View style={styles.toastBox}>
+          <Text style={styles.toastTitle}>✨ {toast.title}</Text>
+          <Text style={styles.toastDesc}>{toast.desc}</Text>
+        </View>
+      )}
 
       {/* HEADER BAR */}
       <View style={styles.header}>
@@ -508,6 +441,7 @@ export default function App() {
           if (screen === 'BANK') setTabAktif('bank');
           if (screen === 'FACTORY') setTabAktif('perniagaan');
           if (screen === 'WAR') setTabAktif('peperangan');
+          if (screen === 'WAREHOUSE') setTabAktif('gudang');
         }}
         onClose={() => setDrawerBuka(false)}
       />
@@ -544,13 +478,10 @@ export default function App() {
             countryName={negaraSemasa}
             disciplines={disciplines}
             activeCampaign={activeEventWar as any}
-            userParty={detailedParties.find((p) => p.id === userPartyId) || null}
+            userParty={null}
             activeStudySession={activeStudySession}
             onNavigate={(tab) => setTabAktif(tab as any)}
-            onQuickWork={() => {
-              if (senaraiKilang.length > 0) handleWorkInFactory(senaraiKilang[0].id);
-              else setTabAktif('perniagaan');
-            }}
+            onQuickWork={handleWorkInFactory}
             onQuickTrain={() => setTabAktif('berek')}
             onSendChatMessage={() => {}}
           />
@@ -578,30 +509,14 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </View>
-          {senaraiKilang.map((k) => (
-            <TouchableOpacity
-              key={k.id}
-              style={styles.catalogItem}
-              onPress={() => {
-                setSelectedFactoryId(k.id);
-                setTabAktif('kilang_detail');
-              }}
-            >
-              <Text style={styles.whiteBold}>{k.name}</Text>
-              <Text style={styles.goldSmall}>Lvl {k.level}</Text>
-            </TouchableOpacity>
-          ))}
         </ScrollView>
       ) : tabAktif === 'peta' ? (
         <View style={{ flex: 1 }}>
           <PetaInteraktif
             onNavigateToRegion={(regionCode) => {
-              if (regionCode.includes('Putrajaya') || regionCode === 'MY_16') {
-                setTabAktif('parlimen');
-              } else {
-                setWilayahSemasa(regionCode);
-                setTabAktif('wilayah');
-              }
+              setWilayahSemasa(regionCode);
+              setTabAktif('wilayah');
+              tunjukNotifikasi('Lokasi Tukar', `Anda kini berada di ${regionCode}.`);
             }}
             onNavigateToNation={() => setTabAktif('negara_view')}
           />
@@ -643,10 +558,7 @@ export default function App() {
           parties={detailedParties}
           playerGold={wang}
           onApplyParty={(partyId) => setUserPartyId(partyId)}
-          onCreateParty={(newParty) => {
-            setDetailedParties((prev) => [...prev, newParty]);
-            setUserPartyId(newParty.id);
-          }}
+          onCreateParty={() => {}}
           onDonateGold={() => {}}
           onLeaveParty={() => setUserPartyId(null)}
           onBack={() => setTabAktif('utama')}
@@ -726,63 +638,6 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={(user) => syncUserData(user)}
       />
-
-      <Modal visible={modalBinaKilang} animationType="fade" transparent={true}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalBox}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionHeaderTitle}>BINA KILANG BARU</Text>
-              <TouchableOpacity onPress={() => setModalBinaKilang(false)}>
-                <Text style={{ color: '#888', fontWeight: 'bold' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
-              {Object.keys(TAKHTA_FACTORY_CATALOG).map((fName) => {
-                const item = TAKHTA_FACTORY_CATALOG[fName];
-                const isSelected = kilangDipilih === fName;
-                return (
-                  <TouchableOpacity key={item.id} style={[styles.catalogItem, isSelected && styles.catalogItemActive]} onPress={() => setKilangDipilih(fName)}>
-                    <Text style={[styles.whiteBold, isSelected && { color: '#F3CE65' }]}>{item.name}</Text>
-                    <Text style={styles.goldSmall}>${item.buildCostRM.toLocaleString()}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.btnTravel} onPress={() => {
-              const bp = TAKHTA_FACTORY_CATALOG[kilangDipilih];
-              if (wang < bp.buildCostRM) {
-                tunjukNotifikasi('Dana Kurang', 'Wang tidak mencukupi.');
-                return;
-              }
-              const newFac: AdvancedFactoryData = {
-                id: `FAC_${Date.now()}`,
-                name: `${bp.name} ${wilayahSemasa}`,
-                factoryType: bp.name,
-                resourceId: bp.resourceId,
-                level: 1,
-                ownerId: pemainId || 'PLAYER_01',
-                ownerName: namaPemain,
-                regionId: wilayahSemasa,
-                regionName: wilayahSemasa,
-                stateName: negaraSemasa,
-                wageType: 'PERCENTAGE',
-                wageRate: 100,
-                treasury: 5000,
-                workerCount: 0,
-                maxWorkers: 10,
-                stock: 50,
-                isWorkingHere: false,
-              };
-              setWang((w) => w - bp.buildCostRM);
-              setSenaraiKilang((prev) => [newFac, ...prev]);
-              setModalBinaKilang(false);
-              tunjukNotifikasi('Berjaya', 'Kilang didirikan!');
-            }}>
-              <Text style={styles.btnTravelTxt}>SAHKAN & BINA KILANG</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <VisaStatusModal
         visible={isVisaModalOpen}
