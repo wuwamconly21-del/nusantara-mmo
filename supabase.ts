@@ -3,16 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// URL & Key ditetapkan terus sebagai fallback sah supaya tidak crash jika process.env kosong
-const SUPABASE_URL = 
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) ||
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
-  'https://quouvzuorkxnrlfkslne.supabase.co';
-
-const SUPABASE_ANON_KEY = 
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) ||
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
-  'sb_publishable_WpPZJEFRXQGfcn6X5SIvHA_7B8DoFFG';
+// URL & Key di-hardcode terus untuk mengelakkan ralat bundler Expo Web
+const SUPABASE_URL = 'https://quouvzuorkxnrlfkslne.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WpPZJEFRXQGfcn6X5SIvHA_7B8DoFFG';
 
 const CustomStorage = Platform.OS === 'web'
   ? {
