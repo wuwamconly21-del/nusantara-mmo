@@ -25,8 +25,11 @@ import {
   Globe2,
   Vote,
   Map as MapIcon,
+  LogIn,
+  LogOut,
 } from 'lucide-react-native';
 import { supabase } from './supabase';
+import { AuthModal } from './src/components/AuthModal';
 import { SidebarMenu } from './src/components/SidebarMenu';
 import { PetaInteraktif } from './src/components/WorldMap/PetaInteraktif';
 
@@ -57,7 +60,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 10,
     backgroundColor: '#09070D',
     borderBottomWidth: 1,
@@ -68,8 +71,20 @@ const styles = StyleSheet.create({
   onlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   greenDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' },
   onlineText: { fontSize: 10, color: '#9CA3AF' },
-  headerTitle: { fontSize: 12, fontWeight: 'bold', color: '#F3CE65', letterSpacing: 0.5 },
+  headerTitle: { fontSize: 11, fontWeight: 'bold', color: '#F3CE65', letterSpacing: 0.5 },
   menuButton: { padding: 4 },
+  authBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E1826',
+    borderWidth: 1,
+    borderColor: '#F3CE65',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  authBtnTxt: { color: '#F3CE65', fontSize: 9, fontWeight: 'bold' },
   body: { flex: 1 },
   bodyContent: { padding: 12, paddingBottom: 24 },
   cardGoldenBorder: {
@@ -212,22 +227,9 @@ type TabUtama =
   | 'bank'
   | 'negara_view';
 
-interface WilayahInfo {
-  id: string;
-  nama: string;
-  negara: string;
-  mataWang: string;
-  penduduk: number;
-  kilang: number;
-  berek: number;
-  parti: number;
-  gabenor: string;
-  perbendaharaan: number;
-  sumberUtama: { nama: string; jumlah: number }[];
-}
-
 export default function App() {
   const [sesi, setSesi] = useState<any>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [tabAktif, setTabAktif] = useState<TabUtama>('utama');
   const [drawerBuka, setDrawerBuka] = useState(false);
   const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
@@ -237,26 +239,8 @@ export default function App() {
   const [negaraSemasa] = useState<string>('Federation of Mahawangsa');
   const [onlineCount] = useState<number>(1);
 
-  const getOrCreateRegionData = (name: string): WilayahInfo => {
-    return {
-      id: name.toLowerCase().replace(/\s+/g, '_'),
-      nama: name,
-      negara: 'Federation of Mahawangsa',
-      mataWang: 'RM',
-      penduduk: 0,
-      kilang: 0,
-      berek: 0,
-      parti: 0,
-      gabenor: 'Tiada',
-      perbendaharaan: 0,
-      sumberUtama: [],
-    };
-  };
-
-  const infoWilayahAktif = getOrCreateRegionData(wilayahSemasa);
-
   const [pemainId, setPemainId] = useState<string | null>(null);
-  const [namaPemain, setNamaPemain] = useState('Pemain Baru');
+  const [namaPemain, setNamaPemain] = useState('Tetamu (Guest)');
   const [tahap, setTahap] = useState(1);
   const [xp, setXp] = useState(0);
   const [hp, setHp] = useState(100);
@@ -273,7 +257,6 @@ export default function App() {
   });
 
   const [activeStudySession, setActiveStudySession] = useState<ActiveStudySession | null>(null);
-
   const [passives, setPassives] = useState<PassiveTalents>({
     pengaruhDaulat: 0,
     pakarUpeti: 0,
@@ -299,29 +282,10 @@ export default function App() {
     GANDUM: 0,
   });
 
-  const calculateMilitaryPower = (units: Partial<Record<MilitaryUnitType, number>>, warSkill: number) => {
-    let basePower = 0;
-    (Object.keys(MILITARY_CATALOG) as MilitaryUnitType[]).forEach((uKey) => {
-      const qty = units[uKey] || 0;
-      basePower += qty * MILITARY_CATALOG[uKey].power;
-    });
-    const skillMultiplier = 1 + (warSkill * 0.5) / 100;
-    return Math.floor(basePower * skillMultiplier);
-  };
-
-  const [playerBarracks, setPlayerBarracks] = useState<PlayerBarracks>({
+  const [playerBarracks] = useState<PlayerBarracks>({
     level: 1,
     maxCapacity: 500,
-    units: {
-      INFANTRI: 0,
-      KERETA_KEBAL: 0,
-      DRON_SERANGAN: 0,
-      JET_PEJUANG: 0,
-      SUBMARINE: 0,
-      STEALTH_BOMBER: 0,
-      KAPAL_PERANG: 0,
-      PELURU_BERPANDU: 0,
-    },
+    units: { INFANTRI: 0, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 },
     totalMilitaryPower: 0,
   });
 
@@ -336,46 +300,13 @@ export default function App() {
     defenderTotalDamage: 0,
     timeRemaining: '00:00:00',
   });
-  const [realWars] = useState<CustomWarCampaign[]>([]);
 
   const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
-  const [selectedFactoryId] = useState<string | null>(null);
   const [modalBinaKilang, setModalBinaKilang] = useState(false);
   const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
 
   const [userPartyId, setUserPartyId] = useState<string | null>(null);
   const [detailedParties, setDetailedParties] = useState<DetailedParty[]>([]);
-
-  const [putrajayaGov] = useState<StateGovernment>({
-    stateCode: 'Putrajaya_MY',
-    stateName: 'Federation of Mahawangsa',
-    regimeType: 'DEMOKRASI_PARLIMEN',
-    totalSeats: 50,
-    rulingPartyId: '',
-    rulingPartyName: 'Tiada',
-    rulingLeaderId: '',
-    rulingLeaderName: 'Tiada',
-    rulingLeaderTitle: 'Tiada',
-    themeColor: '#F3CE65',
-    treasuryGold: 0,
-    taxRatePercent: 5,
-    isEstablished: true,
-    populationCount: 0,
-    resources: {
-      BERLIAN: 0,
-      KULIT: 0,
-      EMAS: 0,
-      MINYAK: 0,
-      MINYAK_DITAPIS: 0,
-      NTE: 0,
-      BAUKSIT: 0,
-      KAYU_CENDANA: 0,
-      KOPI: 0,
-      GANDUM: 0,
-    },
-    activeBills: [],
-    controlledTerritories: ['Kuala Lumpur'],
-  });
 
   const [putrajayaElection, setPutrajayaElection] = useState<ElectionCycleState>({
     stateCode: 'Putrajaya_MY',
@@ -407,133 +338,48 @@ export default function App() {
     ownedShares: [],
   });
 
-  const [bankShares] = useState<BankShareAsset[]>([]);
-
   const tunjukNotifikasi = (tajuk: string, mesej: string) => {
     if (Platform.OS === 'web') window.alert(`${tajuk}: ${mesej}`);
     else Alert.alert(tajuk, mesej);
   };
 
   const handleLogKeluar = async () => {
-    try { await supabase.auth.signOut(); } catch (e) {}
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
     setSesi(null);
     setPemainId(null);
-    setDrawerBuka(false);
-    setTabAktif('utama');
-  };
-
-  const handleAllocatePassive = (key: keyof PassiveTalents) => {
-    if (passivePoints <= 0) {
-      tunjukNotifikasi('Mata Kurang', 'Tiada Baki Mata Pasif tersisa.');
-      return;
-    }
-    setPassivePoints((p) => p - 1);
-    setPassives((prev) => ({ ...prev, [key]: prev[key] + 1 }));
-    tunjukNotifikasi('Kemahiran Ditambah', '1 Mata dimasukkan ke dalam talenta pasif.');
-  };
-
-  const handleStartStudy = (key: keyof PlayerDisciplines, method: 'WANG' | 'NILAM') => {
-    if (activeStudySession) {
-      tunjukNotifikasi('Sedang Bertapa', 'Hanya 1 cabang ilmu boleh didalami pada satu-satu masa!');
-      return;
-    }
-
-    const currentLvl = disciplines[key];
-    const goldCost = DisciplineEngine.getGoldCost(currentLvl);
-    const gemCost = DisciplineEngine.getGemsCost(currentLvl);
-    const durationSecs = DisciplineEngine.getDurationSeconds(currentLvl, method);
-    const durationMs = durationSecs * 1000;
-    const now = Date.now();
-
-    if (method === 'WANG') {
-      if (wang < goldCost) {
-        tunjukNotifikasi('Wang Tidak Cukup', `Perlu $${goldCost.toLocaleString()} RM.`);
-        return;
-      }
-      setWang((w) => w - goldCost);
-    } else {
-      if (nilam < gemCost) {
-        tunjukNotifikasi('Nilam Tidak Cukup', `Perlu ${gemCost} Permata Nilam.`);
-        return;
-      }
-      setNilam((n) => n - gemCost);
-    }
-
-    setActiveStudySession({
-      disciplineKey: key,
-      method,
-      targetLevel: currentLvl + 1,
-      startTime: now,
-      durationMs,
-      endTime: now + durationMs,
-    });
-
-    tunjukNotifikasi('Mula Bertapa', `Latihan dimulakan! Baki masa: ${DisciplineEngine.formatTime(durationSecs)}.`);
-  };
-
-  const handleCompleteStudy = () => {
-    if (!activeStudySession) return;
-    const key = activeStudySession.disciplineKey;
-    const targetLvl = activeStudySession.targetLevel;
-
-    setDisciplines((prev) => {
-      const updated = { ...prev, [key]: targetLvl };
-      if (key === 'ilmuKetenteraan' || key === 'ilmuKejuruteraan') {
-        const newPower = calculateMilitaryPower(playerBarracks.units, updated.ilmuKetenteraan);
-        setPlayerBarracks((b) => ({
-          ...b,
-          level: Math.floor(updated.ilmuKetenteraan / 10) + 1,
-          maxCapacity: 500 + updated.ilmuKejuruteraan * 20,
-          totalMilitaryPower: newPower,
-        }));
-      }
-      return updated;
-    });
-
-    setActiveStudySession(null);
-    tunjukNotifikasi('Khatam Ilmu!', `Tahniah! ${key} meningkat ke Tahap ${targetLvl}!`);
-  };
-
-  const handleWorkInFactory = (factoryId: string) => {
-    const WORK_COOLDOWN_MS = 10 * 60 * 1000;
-    const currentMs = Date.now();
-
-    if (currentMs - lastWorkTimestamp < WORK_COOLDOWN_MS) {
-      tunjukNotifikasi('Perlu Berehat', 'Sila tunggu masa rehat kilang tamat.');
-      return;
-    }
-
-    if (hp < 10) {
-      tunjukNotifikasi('Tenaga Lemah', 'Perlu 10 HP untuk bekerja!');
-      return;
-    }
-
-    setLastWorkTimestamp(currentMs);
-    setHp((h) => h - 10);
-
-    const result = LevelSystem.addXp(tahap, xp, 45, wang + 4000);
-    setTahap(result.newLevel);
-    setXp(result.newXp);
-    setWang(result.newGold);
-    tunjukNotifikasi('Kerja Selesai', '+45 EXP dan +$4,000 RM diperoleh!');
-  };
-
-  const handleTravelToWilayah = (targetWilayah: string) => {
-    setWilayahSemasa(targetWilayah);
-    setTabAktif('wilayah');
-    tunjukNotifikasi('Tiba di Wilayah', `Anda kini berada di ${targetWilayah}.`);
+    setNamaPemain('Tetamu (Guest)');
+    tunjukNotifikasi('Log Keluar', 'Anda telah log keluar.');
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSesi(session);
-      if (session?.user) setPemainId(session.user.id);
+      if (session?.user) {
+        setSesi(session);
+        setPemainId(session.user.id);
+        setNamaPemain(session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Pendekar');
+      }
       setMemuatkan(false);
     });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSesi(session);
+      if (session?.user) {
+        setPemainId(session.user.id);
+        setNamaPemain(session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Pendekar');
+      } else {
+        setPemainId(null);
+        setNamaPemain('Tetamu (Guest)');
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const currentRank = LevelSystem.getRankForLevel(tahap);
-  const activeFactory = senaraiKilang.find((f) => f.id === selectedFactoryId);
 
   if (memuatkan) {
     return (
@@ -557,24 +403,23 @@ export default function App() {
         ) : (
           <View style={styles.onlineBadge}>
             <View style={styles.greenDot} />
-            <Text style={styles.onlineText}>{onlineCount} dalam talian • 📍 {wilayahSemasa}</Text>
+            <Text style={styles.onlineText}>{onlineCount} online • 📍 {wilayahSemasa}</Text>
           </View>
         )}
 
-        <Text style={styles.headerTitle}>
-          {tabAktif === 'profil' ? 'REKOD PENDEKAR & ILMU' :
-           tabAktif === 'peperangan' ? 'MEDAN PEPERANGAN' :
-           tabAktif === 'berek' ? 'BEREK TENTERA & ARSENAL' :
-           tabAktif === 'gudang' ? 'GEDUNG SIMPANAN' :
-           tabAktif === 'bank' ? 'BANK PUSAT & SAHAM' :
-           tabAktif === 'parti' ? 'DEWAN PARTI POLITIK' :
-           tabAktif === 'pilihanraya' ? 'PILIHAN RAYA (PRU / PRN)' :
-           tabAktif === 'perniagaan' ? 'SEKTOR INDUSTRI' :
-           tabAktif === 'parlimen' ? 'DEWAN PERUNDANGAN' :
-           tabAktif === 'peta' ? 'PETA ASIA TENGGARA' :
-           tabAktif === 'wilayah' ? `WILAYAH ${wilayahSemasa.toUpperCase()}` :
-           tabAktif === 'negara_view' ? `NEGARA ${negaraSemasa.toUpperCase()}` : 'TAKHTA'}
-        </Text>
+        <Text style={styles.headerTitle}>TAKHTA: NUSANTARA</Text>
+
+        {sesi ? (
+          <TouchableOpacity style={styles.authBtn} onPress={handleLogKeluar}>
+            <LogOut size={12} color="#F3CE65" />
+            <Text style={styles.authBtnTxt}>LOG KELUAR</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.authBtn} onPress={() => setIsAuthOpen(true)}>
+            <LogIn size={12} color="#F3CE65" />
+            <Text style={styles.authBtnTxt}>LOG MASUK</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.menuButton} onPress={() => setDrawerBuka(true)}>
           <Menu size={22} color="#F3CE65" />
@@ -630,15 +475,10 @@ export default function App() {
             activeCampaign={activeEventWar as any}
             userParty={detailedParties.find((p) => p.id === userPartyId) || null}
             activeStudySession={activeStudySession}
-            onNavigate={(tab) => {
-              if (tab === 'wilayah') setTabAktif('wilayah');
-              else setTabAktif(tab as any);
-            }}
-            onQuickWork={() => {
-              if (senaraiKilang.length > 0) handleWorkInFactory(senaraiKilang[0].id);
-            }}
+            onNavigate={(tab) => setTabAktif(tab as any)}
+            onQuickWork={() => {}}
             onQuickTrain={() => {}}
-            onSendChatMessage={(msg, channel) => console.log(`[Chat #${channel}] ${msg}`)}
+            onSendChatMessage={() => {}}
           />
         </ScrollView>
       ) : tabAktif === 'peta' ? (
@@ -648,104 +488,13 @@ export default function App() {
               if (regionCode.includes('Putrajaya') || regionCode === 'MY_16') {
                 setTabAktif('parlimen');
               } else {
-                handleTravelToWilayah(regionCode);
+                setWilayahSemasa(regionCode);
+                setTabAktif('wilayah');
               }
             }}
             onNavigateToNation={() => setTabAktif('negara_view')}
           />
         </View>
-      ) : tabAktif === 'wilayah' ? (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <View style={styles.cardGoldenBorder}>
-            <View style={styles.rowBetween}>
-              <View style={styles.avatarLetter}><Landmark size={22} color="#F3CE65" /></View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.playerName}>{infoWilayahAktif.nama}</Text>
-                <Text style={styles.playerSub}>{infoWilayahAktif.negara} • 📍 Lokasi Semasa</Text>
-              </View>
-              <TouchableOpacity style={styles.btnMiniGold} onPress={() => setTabAktif('negara_view')}>
-                <Globe2 size={14} color="#07060A" />
-                <Text style={styles.btnMiniGoldText}>PERGI KE NEGARA</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.wilayahStatBar}>
-              <View style={{ alignItems: 'center' }}><Text style={styles.whiteBold}>{infoWilayahAktif.penduduk}</Text><Text style={styles.mutedSmall}>PENDUDUK</Text></View>
-              <View style={{ alignItems: 'center' }}><Text style={styles.whiteBold}>{infoWilayahAktif.kilang}</Text><Text style={styles.mutedSmall}>KILANG</Text></View>
-              <View style={{ alignItems: 'center' }}><Text style={styles.whiteBold}>{infoWilayahAktif.berek}</Text><Text style={styles.mutedSmall}>BEREK</Text></View>
-              <View style={{ alignItems: 'center' }}><Text style={styles.whiteBold}>{infoWilayahAktif.parti}</Text><Text style={styles.mutedSmall}>PARTI</Text></View>
-            </View>
-          </View>
-        </ScrollView>
-      ) : tabAktif === 'negara_view' ? (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <View style={styles.cardGoldenBorder}>
-            <View style={styles.rowBetween}>
-              <View>
-                <Text style={styles.playerName}>🏛️ {negaraSemasa}</Text>
-                <Text style={styles.playerSub}>Sistem Demokrasi Parlimen</Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      ) : tabAktif === 'parlimen' ? (
-        <ParliamentView
-          nationName={negaraSemasa}
-          onBack={() => setTabAktif('utama')}
-        />
-      ) : tabAktif === 'parti' ? (
-        <PartiesScreen
-          currentPlayerId={pemainId || 'PLAYER_01'}
-          currentPlayerName={namaPemain}
-          userPartyId={userPartyId}
-          parties={detailedParties}
-          playerGold={wang}
-          onApplyParty={(partyId: string) => {
-            setUserPartyId(partyId);
-            tunjukNotifikasi('Permohonan Dihantar', 'Permohonan menyertai parti telah dihantar!');
-          }}
-          onCreateParty={(newParty: DetailedParty) => {
-            setDetailedParties((prev) => [...prev, newParty]);
-            setUserPartyId(newParty.id);
-            tunjukNotifikasi('Parti Didirikan', 'Parti politik anda telah selamat didaftarkan!');
-          }}
-          onDonateGold={(partyId: string, amount: number) => {
-            if (wang < amount) {
-              tunjukNotifikasi('Kurang Emas', 'Baki wang tidak mencukupi.');
-              return;
-            }
-            setWang((w) => w - amount);
-            setDetailedParties((prev) =>
-              prev.map((p) => (p.id === partyId ? { ...p, treasuryGold: p.treasuryGold + amount } : p))
-            );
-          }}
-          {...({
-            onAcceptApplicant: () => {},
-            onRejectApplicant: () => {},
-            onAcceptApplication: () => {},
-            onRejectApplication: () => {},
-          } as any)}
-          onLeaveParty={() => setUserPartyId(null)}
-          onBack={() => setTabAktif('utama')}
-        />
-      ) : tabAktif === 'pilihanraya' ? (
-        <ElectionsScreen
-          {...({
-            election: putrajayaElection,
-            electionCycle: putrajayaElection,
-            electionState: putrajayaElection,
-            state: putrajayaElection,
-          } as any)}
-          userPartyId={userPartyId}
-          onCastVote={(partyId: string) => {
-            setPutrajayaElection((prev) => ({
-              ...prev,
-              parties: prev.parties.map((p) => (p.partyId === partyId ? { ...p, totalVotes: p.totalVotes + 1 } : p)),
-            }));
-            tunjukNotifikasi('Undi Diterima', 'Undian anda telah selamat dimasukkan!');
-          }}
-          onBack={() => setTabAktif('utama')}
-        />
       ) : tabAktif === 'profil' ? (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           <DetailedProfileView
@@ -765,89 +514,16 @@ export default function App() {
             activeSession={activeStudySession}
             onUpdateName={(newName) => setNamaPemain(newName)}
             onLogKeluar={handleLogKeluar}
-            onStartStudy={handleStartStudy}
-            onCompleteStudy={handleCompleteStudy}
-            onCancelStudy={() => setActiveStudySession(null)}
-            onAllocatePassive={handleAllocatePassive}
+            onStartStudy={() => {}}
+            onCompleteStudy={() => {}}
+            onCancelStudy={() => {}}
+            onAllocatePassive={() => {}}
           />
         </ScrollView>
-      ) : tabAktif === 'peperangan' ? (
-        <WarHubView
-          campaign={activeEventWar}
-          realWarCampaigns={realWars}
-          playerBarracks={playerBarracks}
-          playerGold={wang}
-          onSendTroops={() => {}}
-          onOpenBarracks={() => setTabAktif('berek')}
-        />
-      ) : tabAktif === 'berek' ? (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <View style={styles.cardGoldenBorder}>
-            <View style={styles.rowBetween}>
-              <View>
-                <Text style={styles.sectionHeaderTitle}>BEREK TENTERA & ARSENAL VISUAL</Text>
-                <Text style={styles.cardDesc}>Tahap Berek: Lvl {playerBarracks.level}</Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
+      ) : tabAktif === 'parlimen' ? (
+        <ParliamentView nationName={negaraSemasa} onBack={() => setTabAktif('utama')} />
       ) : tabAktif === 'gudang' ? (
-        <WarehouseView
-          warehouse={playerWarehouse}
-          playerGold={wang}
-          onSellResource={(resId, amt, price) => {
-            setPlayerWarehouse((prev) => ({ ...prev, [resId]: prev[resId] - amt }));
-            setWang((w) => w + amt * price);
-          }}
-          onBack={() => setTabAktif('utama')}
-        />
-      ) : tabAktif === 'bank' ? (
-        <CentralBankView
-          bank={centralBank}
-          ledger={playerBankLedger}
-          shares={bankShares}
-          playerGold={wang}
-          isCabinetMinister={false}
-          onDeposit={(amt) => setWang((w) => w - amt)}
-          onWithdraw={(amt) => setWang((w) => w + amt)}
-          onTakeLoan={(amt) => setWang((w) => w + amt)}
-          onRepayLoan={(amt) => setWang((w) => w - amt)}
-          onBuyShares={() => {}}
-          onSellShares={() => {}}
-          onBack={() => setTabAktif('utama')}
-        />
-      ) : tabAktif === 'perniagaan' ? (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <View style={styles.cardGoldenBorder}>
-            <View style={styles.rowBetween}>
-              <View>
-                <Text style={styles.sectionHeaderTitle}>KILANG & INDUSTRI WILAYAH</Text>
-              </View>
-              <TouchableOpacity style={styles.btnMiniGold} onPress={() => setModalBinaKilang(true)}>
-                <Plus size={14} color="#07060A" />
-                <Text style={styles.btnMiniGoldText}>+ BINA KILANG</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      ) : tabAktif === 'kilang_detail' && activeFactory ? (
-        <FactoryDetailView
-          factory={activeFactory}
-          playerGold={wang}
-          currentPlayerId={pemainId || 'PLAYER_01'}
-          currentRegionId={infoWilayahAktif.id}
-          isHomeRegion={true}
-          taxRatePercent={putrajayaGov.taxRatePercent}
-          lastWorkTimestamp={lastWorkTimestamp}
-          onBack={() => setTabAktif('perniagaan')}
-          onWorkInFactory={handleWorkInFactory}
-          onSaveWage={() => {}}
-          onDepositTreasury={() => {}}
-          onWithdrawTreasury={() => {}}
-          onUpgradeFactory={() => {}}
-          onCloseFactory={() => {}}
-          onTravelToRegion={() => {}}
-        />
+        <WarehouseView warehouse={playerWarehouse} playerGold={wang} onSellResource={() => {}} onBack={() => setTabAktif('utama')} />
       ) : null}
 
       {/* BOTTOM NAV */}
@@ -859,17 +535,12 @@ export default function App() {
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'peperangan' && styles.bottomNavItemActive]} onPress={() => setTabAktif('peperangan')}>
           <Swords size={18} color={tabAktif === 'peperangan' ? '#EF4444' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'peperangan' && { color: '#EF4444', fontWeight: 'bold' }]}>Perang</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'perniagaan' && styles.bottomNavItemActive]} onPress={() => setTabAktif('perniagaan')}>
-          <Factory size={18} color={tabAktif === 'perniagaan' ? '#F3CE65' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'perniagaan' && styles.bottomNavTextActive]}>Kilang</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'peperangan' && { color: '#EF4444' }]}>Perang</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'gudang' && styles.bottomNavItemActive]} onPress={() => setTabAktif('gudang')}>
           <Package size={18} color={tabAktif === 'gudang' ? '#38BDF8' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'gudang' && { color: '#38BDF8', fontWeight: 'bold' }]}>Gudang</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'gudang' && { color: '#38BDF8' }]}>Gudang</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'profil' && styles.bottomNavItemActive]} onPress={() => setTabAktif('profil')}>
@@ -878,79 +549,16 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={modalBinaKilang} animationType="fade" transparent={true}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalBox}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionHeaderTitle}>BINA KILANG BARU</Text>
-              <TouchableOpacity onPress={() => setModalBinaKilang(false)}>
-                <Text style={{ color: '#888', fontWeight: 'bold' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
-              {Object.keys(TAKHTA_FACTORY_CATALOG).map((fName) => {
-                const item = TAKHTA_FACTORY_CATALOG[fName];
-                const isSelected = kilangDipilih === fName;
-                return (
-                  <TouchableOpacity key={item.id} style={[styles.catalogItem, isSelected && styles.catalogItemActive]} onPress={() => setKilangDipilih(fName)}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
-                      <View>
-                        <Text style={[styles.whiteBold, isSelected && { color: '#F3CE65' }]}>{item.name}</Text>
-                        <Text style={styles.mutedSmall}>{item.desc}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.goldSmall}>${item.buildCostRM.toLocaleString()}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <TouchableOpacity style={styles.btnTravel} onPress={() => {
-              const bp = TAKHTA_FACTORY_CATALOG[kilangDipilih];
-              if (wang < bp.buildCostRM) {
-                tunjukNotifikasi('Dana Kurang', 'Wang tidak mencukupi.');
-                return;
-              }
-              const newFac: AdvancedFactoryData = {
-                id: `FAC_${Date.now()}`,
-                name: `${bp.name} ${wilayahSemasa}`,
-                factoryType: bp.name,
-                resourceId: bp.resourceId,
-                level: 1,
-                ownerId: pemainId || 'PLAYER_01',
-                ownerName: namaPemain,
-                regionId: infoWilayahAktif.id,
-                regionName: wilayahSemasa,
-                stateName: negaraSemasa,
-                wageType: 'PERCENTAGE',
-                wageRate: 100,
-                treasury: 5000,
-                workerCount: 0,
-                maxWorkers: 10,
-                stock: 50,
-                isWorkingHere: false,
-              };
-              setWang((w) => w - bp.buildCostRM);
-              setSenaraiKilang((prev) => [newFac, ...prev]);
-              setModalBinaKilang(false);
-              tunjukNotifikasi('Berjaya', 'Kilang didirikan!');
-            }}>
-              <Text style={styles.btnTravelTxt}>SAHKAN & BINA KILANG</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <VisaStatusModal
-        visible={isVisaModalOpen}
-        playerName={namaPemain}
-        currentRegion={wilayahSemasa}
-        currentCountry={negaraSemasa}
-        visaStatus="TOURIST"
-        applications={[]}
-        onClose={() => setIsVisaModalOpen(false)}
+      {/* MODAL AUTHENTICATION (LOGIN & REGISTER) */}
+      <AuthModal
+        visible={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onAuthSuccess={(user) => {
+          if (user) {
+            setPemainId(user.id);
+            setNamaPemain(user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar');
+          }
+        }}
       />
     </SafeAreaView>
   );
