@@ -26,8 +26,6 @@ import {
   Map as MapIcon,
   LogIn,
   LogOut,
-  Landmark as BankIcon,
-  Shield,
   FileText,
 } from 'lucide-react-native';
 import { supabase } from './supabase';
@@ -143,6 +141,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shortcutText: { color: '#F3CE65', fontSize: 9, fontWeight: 'bold', marginTop: 4, textAlign: 'center' },
+  catalogItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#18141F',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2B2035',
+    marginBottom: 6,
+  },
+  catalogItemActive: { borderColor: '#F3CE65', backgroundColor: '#22192D' },
+  btnTravel: {
+    backgroundColor: '#1E1826',
+    borderWidth: 1,
+    borderColor: '#F3CE65',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  btnTravelTxt: { color: '#F3CE65', fontSize: 11, fontWeight: 'bold' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#120F17',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3CE65',
+    padding: 16,
+  },
 });
 
 type TabUtama =
@@ -171,7 +208,7 @@ export default function App() {
   const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
   const [memuatkan, setMemuatkan] = useState(true);
 
-  // In-game Notification Toast
+  // In-Game Notification Toast System
   const [toast, setToast] = useState<{ visible: boolean; title: string; desc: string }>({
     visible: false,
     title: '',
@@ -196,7 +233,6 @@ export default function App() {
   const [hp, setHp] = useState(100);
   const [wang, setWang] = useState(6050);
   const [nilam, setNilam] = useState(0);
-  const [lastWorkTimestamp, setLastWorkTimestamp] = useState<number>(0);
 
   const [disciplines, setDisciplines] = useState<PlayerDisciplines>({
     ilmuKetenteraan: 1,
@@ -232,7 +268,7 @@ export default function App() {
     GANDUM: 0,
   });
 
-  const [playerBarracks, setPlayerBarracks] = useState<PlayerBarracks>({
+  const [playerBarracks] = useState<PlayerBarracks>({
     level: 1,
     maxCapacity: 500,
     units: { INFANTRI: 5, KERETA_KEBAL: 0, DRON_SERANGAN: 0, JET_PEJUANG: 0, SUBMARINE: 0, STEALTH_BOMBER: 0, KAPAL_PERANG: 0, PELURU_BERPANDU: 0 },
@@ -254,7 +290,7 @@ export default function App() {
   const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState<string | null>(null);
   const [modalBinaKilang, setModalBinaKilang] = useState(false);
-  const [kilangDipilih] = useState<string>('Kilang Berlian');
+  const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
 
   const [userPartyId, setUserPartyId] = useState<string | null>(null);
   const [detailedParties] = useState<DetailedParty[]>([]);
@@ -356,6 +392,68 @@ export default function App() {
     tunjukNotifikasi('Gempuran Berjaya!', `Menyerang ${side}! (+${expGained} EXP, +$${goldGained.toLocaleString()} RM).`);
   };
 
+  const handleStartStudy = (key: keyof PlayerDisciplines, method: 'WANG' | 'NILAM') => {
+    if (activeStudySession) {
+      tunjukNotifikasi('Sedang Bertapa', 'Hanya 1 cabang ilmu boleh didalami pada satu-satu masa!');
+      return;
+    }
+
+    const currentLvl = disciplines[key];
+    const goldCost = DisciplineEngine.getGoldCost(currentLvl);
+    const gemCost = DisciplineEngine.getGemsCost(currentLvl);
+    const durationSecs = DisciplineEngine.getDurationSeconds(currentLvl, method);
+    const durationMs = durationSecs * 1000;
+    const now = Date.now();
+
+    if (method === 'WANG') {
+      if (wang < goldCost) {
+        tunjukNotifikasi('Wang Tidak Cukup', `Perlu $${goldCost.toLocaleString()} RM.`);
+        return;
+      }
+      setWang((w) => w - goldCost);
+    } else {
+      if (nilam < gemCost) {
+        tunjukNotifikasi('Nilam Tidak Cukup', `Perlu ${gemCost} Permata Nilam.`);
+        return;
+      }
+      setNilam((n) => n - gemCost);
+    }
+
+    setActiveStudySession({
+      disciplineKey: key,
+      method,
+      targetLevel: currentLvl + 1,
+      startTime: now,
+      durationMs,
+      endTime: now + durationMs,
+    });
+
+    tunjukNotifikasi('Mula Bertapa', `Latihan dimulakan! Baki masa: ${DisciplineEngine.formatTime(durationSecs)}.`);
+  };
+
+  const handleCompleteStudy = () => {
+    if (!activeStudySession) return;
+    const key = activeStudySession.disciplineKey;
+    const targetLvl = activeStudySession.targetLevel;
+
+    setDisciplines((prev) => ({ ...prev, [key]: targetLvl }));
+    setActiveStudySession(null);
+    tunjukNotifikasi('Khatam Ilmu!', `Tahniah! ${key} meningkat ke Tahap ${targetLvl}!`);
+  };
+
+  // PEMASA SKILL TIMER LATAR BELAKANG (PERKIRAAN SETIAP SAAT)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (activeStudySession) {
+        const remaining = activeStudySession.endTime - Date.now();
+        if (remaining <= 0) {
+          handleCompleteStudy();
+        }
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeStudySession]);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSesi(session);
@@ -442,6 +540,7 @@ export default function App() {
           if (screen === 'FACTORY') setTabAktif('perniagaan');
           if (screen === 'WAR') setTabAktif('peperangan');
           if (screen === 'WAREHOUSE') setTabAktif('gudang');
+          if (screen === 'VISA') setIsVisaModalOpen(true);
         }}
         onClose={() => setDrawerBuka(false)}
       />
@@ -540,10 +639,10 @@ export default function App() {
             activeSession={activeStudySession}
             onUpdateName={(newName) => setNamaPemain(newName)}
             onLogKeluar={handleLogKeluar}
-            onStartStudy={() => {}}
-            onCompleteStudy={() => {}}
-            onCancelStudy={() => {}}
-            onAllocatePassive={() => {}}
+            onStartStudy={handleStartStudy}
+            onCompleteStudy={handleCompleteStudy}
+            onCancelStudy={() => setActiveStudySession(null)}
+            onAllocatePassive={(key) => setPassivePoints((p) => Math.max(0, p - 1))}
           />
         </ScrollView>
       ) : tabAktif === 'parlimen' ? (
@@ -593,7 +692,7 @@ export default function App() {
           currentRegionId={wilayahSemasa}
           isHomeRegion={true}
           taxRatePercent={putrajayaGov.taxRatePercent}
-          lastWorkTimestamp={lastWorkTimestamp}
+          lastWorkTimestamp={0}
           onBack={() => setTabAktif('perniagaan')}
           onWorkInFactory={handleWorkInFactory}
           onSaveWage={() => {}}
@@ -633,12 +732,72 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      {/* AUTH POPUP MODAL */}
       <AuthModal
         visible={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={(user) => syncUserData(user)}
       />
 
+      {/* BINA KILANG MODAL */}
+      <Modal visible={modalBinaKilang} animationType="fade" transparent={true}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalBox}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.sectionHeaderTitle}>BINA KILANG BARU</Text>
+              <TouchableOpacity onPress={() => setModalBinaKilang(false)}>
+                <Text style={{ color: '#888', fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
+              {Object.keys(TAKHTA_FACTORY_CATALOG).map((fName) => {
+                const item = TAKHTA_FACTORY_CATALOG[fName];
+                const isSelected = kilangDipilih === fName;
+                return (
+                  <TouchableOpacity key={item.id} style={[styles.catalogItem, isSelected && styles.catalogItemActive]} onPress={() => setKilangDipilih(fName)}>
+                    <Text style={[styles.whiteBold, isSelected && { color: '#F3CE65' }]}>{item.name}</Text>
+                    <Text style={styles.goldSmall}>${item.buildCostRM.toLocaleString()}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity style={styles.btnTravel} onPress={() => {
+              const bp = TAKHTA_FACTORY_CATALOG[kilangDipilih];
+              if (wang < bp.buildCostRM) {
+                tunjukNotifikasi('Dana Kurang', 'Wang tidak mencukupi.');
+                return;
+              }
+              const newFac: AdvancedFactoryData = {
+                id: `FAC_${Date.now()}`,
+                name: `${bp.name} ${wilayahSemasa}`,
+                factoryType: bp.name,
+                resourceId: bp.resourceId,
+                level: 1,
+                ownerId: pemainId || 'PLAYER_01',
+                ownerName: namaPemain,
+                regionId: wilayahSemasa,
+                regionName: wilayahSemasa,
+                stateName: negaraSemasa,
+                wageType: 'PERCENTAGE',
+                wageRate: 100,
+                treasury: 5000,
+                workerCount: 0,
+                maxWorkers: 10,
+                stock: 50,
+                isWorkingHere: false,
+              };
+              setWang((w) => w - bp.buildCostRM);
+              setSenaraiKilang((prev) => [newFac, ...prev]);
+              setModalBinaKilang(false);
+              tunjukNotifikasi('Berjaya', 'Kilang didirikan!');
+            }}>
+              <Text style={styles.btnTravelTxt}>SAHKAN & BINA KILANG</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* VISA DOKUMEN MODAL */}
       <VisaStatusModal
         visible={isVisaModalOpen}
         playerName={namaPemain}
