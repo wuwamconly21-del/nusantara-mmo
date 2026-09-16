@@ -7,15 +7,15 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
-  Alert,
   Platform,
+  Alert,
 } from 'react-native';
 import { supabase } from '../../supabase';
 
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
-  onAuthSuccess: (user: any) => void;
+  onAuthSuccess: (user: any, isNewUser?: boolean) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSuccess }) => {
@@ -30,6 +30,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
     else Alert.alert(title, msg);
   };
 
+  const handleGoogleAuth = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      notify('Ralat Google Auth', err.message);
+    }
+  };
+
   const handleAuth = async () => {
     if (!email || !password) {
       notify('Ralat', 'Sila isi e-mel dan kata laluan.');
@@ -42,41 +56,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: { username: username || 'Pendekar Nusantara' },
-          },
+          options: { data: { username: username || 'Pendekar' } },
         });
 
         if (error) throw error;
 
         if (data.user) {
           await supabase.from('profiles').upsert([
-            {
-              id: data.user.id,
-              username: username || 'Pendekar Nusantara',
-              gold: 1000,
-              level: 1,
-            },
+            { id: data.user.id, username: username || 'Pendekar', gold: 1000, level: 1 },
           ]);
         }
-
-        notify('Pendaftaran Berjaya', 'Akaun dicipta! Selamat datang.');
-        onAuthSuccess(data.user);
+        onAuthSuccess(data.user, true);
         onClose();
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-
-        notify('Selamat Kembali', 'Log masuk berjaya!');
-        onAuthSuccess(data.user);
+        onAuthSuccess(data.user, false);
         onClose();
       }
     } catch (err: any) {
-      notify('Ralat Auth', err.message || 'Gagal untuk log masuk.');
+      notify('Ralat', err.message);
     } finally {
       setLoading(false);
     }
@@ -87,9 +86,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>🏛️ NUSANTARA MMO</Text>
-          <Text style={styles.subtitle}>
-            {isSignUp ? 'DAFTAR AKAUN PENDEKAR BARU' : 'LOG MASUK AKAUN'}
-          </Text>
+          <Text style={styles.subtitle}>{isSignUp ? 'DAFTAR PENDEKAR BARU' : 'LOG MASUK AKAUN'}</Text>
+
+          {/* GOOGLE AUTH BUTTON */}
+          <TouchableOpacity style={styles.btnGoogle} onPress={handleGoogleAuth}>
+            <Text style={styles.btnGoogleText}>🌐 LOG MASUK GUNA GOOGLE</Text>
+          </TouchableOpacity>
+
+          <Text style={{ color: '#64748B', fontSize: 10, marginVertical: 8 }}>— ATAU GUNA E-MEL —</Text>
 
           {isSignUp && (
             <TextInput
@@ -121,21 +125,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
           />
 
           <TouchableOpacity style={styles.btnPrimary} onPress={handleAuth} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="#07060A" />
-            ) : (
-              <Text style={styles.btnPrimaryText}>{isSignUp ? 'DAFTAR AKAUN' : 'LOG MASUK'}</Text>
-            )}
+            {loading ? <ActivityIndicator color="#07060A" /> : <Text style={styles.btnPrimaryText}>{isSignUp ? 'DAFTAR' : 'LOG MASUK'}</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={{ marginTop: 14 }}>
-            <Text style={styles.switchText}>
-              {isSignUp ? 'Dah ada akaun? Log Masuk' : 'Belum ada akaun? Daftar Sekarang'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={onClose} style={{ marginTop: 16 }}>
-            <Text style={styles.closeText}>Tutup / Teruskan</Text>
+          <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={{ marginTop: 12 }}>
+            <Text style={styles.switchText}>{isSignUp ? 'Dah ada akaun? Log Masuk' : 'Belum ada akaun? Daftar Sekarang'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -144,47 +138,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ visible, onClose, onAuthSu
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    zIndex: 99999,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#120F17',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F3CE65',
-    padding: 20,
-    alignItems: 'center',
-  },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 99999 },
+  card: { width: '100%', maxWidth: 360, backgroundColor: '#120F17', borderRadius: 8, borderWidth: 1, borderColor: '#F3CE65', padding: 20, alignItems: 'center' },
   title: { fontSize: 20, fontWeight: 'bold', color: '#F3CE65', marginBottom: 4 },
-  subtitle: { fontSize: 10, color: '#9CA3AF', marginBottom: 16 },
-  input: {
-    width: '100%',
-    backgroundColor: '#18141F',
-    borderWidth: 1,
-    borderColor: '#2B2035',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#FFF',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  btnPrimary: {
-    width: '100%',
-    backgroundColor: '#F3CE65',
-    borderRadius: 6,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 6,
-  },
+  subtitle: { fontSize: 10, color: '#9CA3AF', marginBottom: 12 },
+  btnGoogle: { width: '100%', backgroundColor: '#4285F4', paddingVertical: 10, borderRadius: 6, alignItems: 'center', marginBottom: 6 },
+  btnGoogleText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
+  input: { width: '100%', backgroundColor: '#18141F', borderWidth: 1, borderColor: '#2B2035', borderRadius: 6, padding: 10, color: '#FFF', fontSize: 12, marginBottom: 8 },
+  btnPrimary: { width: '100%', backgroundColor: '#F3CE65', borderRadius: 6, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   btnPrimaryText: { color: '#07060A', fontSize: 11, fontWeight: 'bold' },
-  switchText: { color: '#38BDF8', fontSize: 11, textDecorationLine: 'underline' },
-  closeText: { color: '#64748B', fontSize: 10 },
+  switchText: { color: '#38BDF8', fontSize: 10, textDecorationLine: 'underline' },
 });
