@@ -227,7 +227,7 @@ export default function App() {
   const [xp, setXp] = useState(0);
   const [hp, setHp] = useState(100);
   const [wang, setWang] = useState(6050);
-  const [nilam, setNilam] = useState(1500); // 1500 Diamond bonus permulaan
+  const [nilam, setNilam] = useState(1500);
 
   const [disciplines, setDisciplines] = useState<PlayerDisciplines>({
     ilmuKetenteraan: 1,
@@ -287,7 +287,7 @@ export default function App() {
     playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
-  // FUNGSI SYNC DATA DISARING MENGIKUT NAMA KOLUM SUPABASE BAHASA MELAYU
+  // FUNGSI SYNC & UPSERT KE SUPABASE MENGGUNAKAN KOLUM BM
   const syncUserData = async (user: any) => {
     if (user) {
       setPemainId(user.id);
@@ -302,7 +302,6 @@ export default function App() {
         setHp(data.hp ?? 100);
         if (data.wilayah_id) setWilayahSemasa(data.wilayah_id);
       } else {
-        // Pendaftaran pertama: Masukkan terus 1500 permata nilam sekali seumur hidup
         const newProfile = {
           id: user.id,
           username: user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar',
@@ -334,7 +333,6 @@ export default function App() {
     tunjukNotifikasi('Log Keluar', 'Anda kini bermain sebagai Tetamu.');
   };
 
-  // KERJA DI KILANG (AUTO-SAVE KE KOLUM SUPABASE BM)
   const handleWorkInFactory = async () => {
     if (hp < 10) {
       tunjukNotifikasi('Tenaga Lemah', 'Memerlukan sekurang-kurangnya 10 HP!');
