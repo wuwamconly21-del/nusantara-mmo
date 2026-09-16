@@ -1,205 +1,225 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { VisaStatusModal } from './Immigration/VisaStatusModal';
+import React from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
+} from 'react-native';
+import {
+  Map,
+  Landmark,
+  Users,
+  Vote,
+  User,
+  Building2,
+  Factory,
+  Swords,
+  Package,
+  FileText,
+  LogOut,
+  LogIn,
+  X,
+} from 'lucide-react-native';
 
 interface SidebarMenuProps {
   visible: boolean;
   playerName: string;
   userGold: number;
   userGems: number;
-  onNavigate: (screen: 'MAP' | 'PARLIAMENT' | 'PARTY' | 'ELECTIONS' | 'PROFILE') => void;
+  userIsLoggedIn?: boolean;
+  onNavigate: (screen: string) => void;
   onClose: () => void;
+  onLogKeluar?: () => void;
+  onLogMasuk?: () => void;
 }
 
-export function SidebarMenu({
+export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   visible,
   playerName,
   userGold,
   userGems,
+  userIsLoggedIn = false,
   onNavigate,
   onClose,
-}: SidebarMenuProps) {
-  const [isVisaModalOpen, setIsVisaModalOpen] = useState(false);
-
-  if (!visible) return null;
+  onLogKeluar,
+  onLogMasuk,
+}) => {
+  const handleNav = (screen: string) => {
+    onNavigate(screen);
+    onClose();
+  };
 
   return (
-    <View style={styles.overlay}>
-      <View style={styles.sidebarContainer}>
-        {/* HEADER PROFIL SIDEBAR */}
-        <View style={styles.header}>
-          <View style={styles.avatarBox}>
-            <Text style={styles.avatarTxt}>{playerName.charAt(0)}</Text>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={styles.drawerContainer}>
+          {/* DRAWER HEADER */}
+          <View style={styles.drawerHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.playerTitle}>{playerName}</Text>
+              <Text style={styles.playerSub}>
+                💰 ${userGold.toLocaleString()} RM • 💎 {userGems} Nilam
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <X size={20} color="#F3CE65" />
+            </TouchableOpacity>
           </View>
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.playerName}>{playerName}</Text>
-            <Text style={styles.subText}>📍 Putrajaya, Malaysia</Text>
+
+          {/* MENU ITEMS */}
+          <ScrollView style={styles.menuList} contentContainerStyle={{ paddingBottom: 20 }}>
+            <Text style={styles.sectionTitle}>TEROKA</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('MAP')}>
+              <Map size={18} color="#F3CE65" />
+              <Text style={styles.menuText}>Peta Dunia & Region</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('WAR')}>
+              <Swords size={18} color="#EF4444" />
+              <Text style={styles.menuText}>Medan Peperangan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('FACTORY')}>
+              <Factory size={18} color="#F3CE65" />
+              <Text style={styles.menuText}>Sektor Perkilangan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('WAREHOUSE')}>
+              <Package size={18} color="#38BDF8" />
+              <Text style={styles.menuText}>Gedung Simpanan</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.sectionTitle}>PENTADBIRAN & NEGERI</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('PARLIAMENT')}>
+              <Landmark size={18} color="#F3CE65" />
+              <Text style={styles.menuText}>Parlimen & Perundangan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('PARTY')}>
+              <Users size={18} color="#F3CE65" />
+              <Text style={styles.menuText}>Dewan Parti Politik</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('ELECTIONS')}>
+              <Vote size={18} color="#10B981" />
+              <Text style={styles.menuText}>Pilihan Raya (PRU / PRN)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('BANK')}>
+              <Building2 size={18} color="#F59E0B" />
+              <Text style={styles.menuText}>Bank Pusat & Perbankan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('VISA')}>
+              <FileText size={18} color="#A855F7" />
+              <Text style={styles.menuText}>Pasport & Dokumen Visa</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.sectionTitle}>AKAUN & PROFIL</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNav('PROFILE')}>
+              <User size={18} color="#F3CE65" />
+              <Text style={styles.menuText}>Rekod & Ilmu Pendekar</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* AUTH ACTION AT BOTTOM */}
+          <View style={styles.drawerFooter}>
+            {userIsLoggedIn ? (
+              <TouchableOpacity
+                style={styles.logoutBtn}
+                onPress={() => {
+                  if (onLogKeluar) onLogKeluar();
+                  onClose();
+                }}
+              >
+                <LogOut size={16} color="#EF4444" />
+                <Text style={styles.logoutBtnTxt}>LOG KELUAR AKAUN</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.loginBtn}
+                onPress={() => {
+                  if (onLogMasuk) onLogMasuk();
+                  onClose();
+                }}
+              >
+                <LogIn size={16} color="#07060A" />
+                <Text style={styles.loginBtnTxt}>LOG MASUK / DAFTAR</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.closeBtn}>✕</Text>
-          </TouchableOpacity>
         </View>
-
-        {/* BAKI EMAS & PERMATA */}
-        <View style={styles.currencyRow}>
-          <Text style={styles.goldTxt}>💰 RM {userGold.toLocaleString()}</Text>
-          <Text style={styles.gemTxt}>💎 {userGems}</Text>
-        </View>
-
-        <ScrollView style={styles.menuList}>
-          {/* SEKSYEN TEROKA */}
-          <Text style={styles.sectionTitle}>TEROKA</Text>
-          
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onNavigate('MAP');
-              onClose();
-            }}
-          >
-            <Text style={styles.menuIcon}>🗺️</Text>
-            <Text style={styles.menuLabel}>Peta Dunia</Text>
-          </TouchableOpacity>
-
-          {/* SEKSYEN PENTADBIRAN & GEOPOLITIK */}
-          <Text style={styles.sectionTitle}>PENTADBIRAN & NEGERI</Text>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onNavigate('PARLIAMENT');
-              onClose();
-            }}
-          >
-            <Text style={styles.menuIcon}>🏛️</Text>
-            <Text style={styles.menuLabel}>Parlimen</Text>
-          </TouchableOpacity>
-
-          {/* TAB PARTI (KINI AKTIF) */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onNavigate('PARTY');
-              onClose();
-            }}
-          >
-            <Text style={styles.menuIcon}>🚩</Text>
-            <Text style={styles.menuLabel}>Parti Politik</Text>
-          </TouchableOpacity>
-
-          {/* TAB PILIHAN RAYA (KINI AKTIF) */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onNavigate('ELECTIONS');
-              onClose();
-            }}
-          >
-            <Text style={styles.menuIcon}>🗳️</Text>
-            <Text style={styles.menuLabel}>Pilihan Raya (PRU / PRN)</Text>
-          </TouchableOpacity>
-
-          {/* TAB PASPORT & VISA REGALE (DARI VIDEO ABANG) */}
-          <TouchableOpacity
-            style={[styles.menuItem, styles.visaHighlight]}
-            onPress={() => setIsVisaModalOpen(true)}
-          >
-            <Image
-              source={{ uri: '/assets/visa_regale_icon.png' }}
-              style={styles.visaIconImg}
-              resizeMode="contain"
-            />
-            <Text style={[styles.menuLabel, { color: '#F59E0B', fontWeight: 'bold' }]}>
-              Pasport & Dokumen Visa
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
       </View>
-
-      {/* MODAL STATUS PASPORT & VISA REGALE */}
-      <VisaStatusModal
-        visible={isVisaModalOpen}
-        playerName={playerName}
-        currentRegion="Putrajaya"
-        currentCountry="Malaysia"
-        visaStatus="TOURIST"
-        applications={[]}
-        onClose={() => setIsVisaModalOpen(false)}
-      />
-    </View>
+    </Modal>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    zIndex: 200,
-  },
-  sidebarContainer: {
-    width: 280,
-    height: '100%',
-    backgroundColor: '#0F172A',
-    borderLeftWidth: 1.5,
-    borderColor: '#D97706',
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  drawerContainer: {
+    width: '100%',
+    maxHeight: '85%',
+    backgroundColor: '#0E0B14',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderWidth: 1,
+    borderColor: '#3D311F',
     padding: 16,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    paddingBottom: 12,
-  },
-  avatarBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 6,
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#D97706',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarTxt: { color: '#F59E0B', fontSize: 16, fontWeight: 'bold' },
-  playerName: { color: '#F8FAFC', fontSize: 13, fontWeight: 'bold' },
-  subText: { color: '#64748B', fontSize: 9, marginTop: 1 },
-  closeBtn: { color: '#94A3B8', fontSize: 16, fontWeight: 'bold', padding: 4 },
-  currencyRow: {
+  drawerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#182234',
-    padding: 10,
-    borderRadius: 6,
-    marginVertical: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderColor: '#1E1826',
+    marginBottom: 10,
   },
-  goldTxt: { color: '#F59E0B', fontSize: 11, fontWeight: 'bold' },
-  gemTxt: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
+  playerTitle: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
+  playerSub: { color: '#F3CE65', fontSize: 11, marginTop: 2 },
+  closeBtn: { padding: 4 },
   menuList: { flex: 1 },
-  sectionTitle: { color: '#64748B', fontSize: 9, fontWeight: 'bold', marginTop: 12, marginBottom: 6, letterSpacing: 1 },
+  sectionTitle: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginTop: 12,
+    marginBottom: 6,
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  visaHighlight: {
-    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    gap: 12,
+    backgroundColor: '#14101B',
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.4)',
-    marginTop: 6,
+    borderColor: '#22192D',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 6,
   },
-  menuIcon: { fontSize: 16, marginRight: 10 },
-  visaIconImg: { width: 20, height: 20, marginRight: 10 },
-  menuLabel: { color: '#CBD5E1', fontSize: 12 },
+  menuText: { color: '#FFF', fontSize: 12, fontWeight: '500' },
+  drawerFooter: { paddingTop: 12, borderTopWidth: 1, borderColor: '#1E1826' },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E141D',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: 6,
+    paddingVertical: 12,
+  },
+  logoutBtnTxt: { color: '#EF4444', fontSize: 11, fontWeight: 'bold', marginLeft: 8 },
+  loginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3CE65',
+    borderRadius: 6,
+    paddingVertical: 12,
+  },
+  loginBtnTxt: { color: '#07060A', fontSize: 11, fontWeight: 'bold', marginLeft: 8 },
 });
