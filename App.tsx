@@ -23,7 +23,6 @@ import {
   Plus,
   Package,
   Globe2,
-  MapPin,
   Vote,
   Map as MapIcon,
 } from 'lucide-react-native';
@@ -122,14 +121,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   btnMiniGoldText: { color: '#07060A', fontSize: 9, fontWeight: 'bold' },
-  factoryItemCard: {
-    backgroundColor: '#14101B',
-    padding: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2B2035',
-    marginTop: 6,
-  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',
@@ -243,10 +234,9 @@ export default function App() {
   const [memuatkan, setMemuatkan] = useState(true);
 
   const [wilayahSemasa, setWilayahSemasa] = useState<string>('Kuala Lumpur');
-  const [negaraSemasa, setNegaraSemasa] = useState<string>('Federation of Mahawangsa');
+  const [negaraSemasa] = useState<string>('Federation of Mahawangsa');
   const [onlineCount] = useState<number>(1);
 
-  // Penjana Dinamik untuk menyokong mana-mana daripada 208 wilayah Peta Interaktif
   const getOrCreateRegionData = (name: string): WilayahInfo => {
     return {
       id: name.toLowerCase().replace(/\s+/g, '_'),
@@ -265,7 +255,6 @@ export default function App() {
 
   const infoWilayahAktif = getOrCreateRegionData(wilayahSemasa);
 
-  // Clean state (tiada data dummy)
   const [pemainId, setPemainId] = useState<string | null>(null);
   const [namaPemain, setNamaPemain] = useState('Pemain Baru');
   const [tahap, setTahap] = useState(1);
@@ -350,7 +339,7 @@ export default function App() {
   const [realWars] = useState<CustomWarCampaign[]>([]);
 
   const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
-  const [selectedFactoryId, setSelectedFactoryId] = useState<string | null>(null);
+  const [selectedFactoryId] = useState<string | null>(null);
   const [modalBinaKilang, setModalBinaKilang] = useState(false);
   const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
 
@@ -505,51 +494,6 @@ export default function App() {
     tunjukNotifikasi('Khatam Ilmu!', `Tahniah! ${key} meningkat ke Tahap ${targetLvl}!`);
   };
 
-  const handleTrainUnit = (unitType: MilitaryUnitType) => {
-    const bp = MILITARY_CATALOG[unitType];
-    if (!bp) return;
-
-    if (disciplines.ilmuKetenteraan < bp.reqSkillWar || disciplines.ilmuKejuruteraan < bp.reqSkillEng) {
-      tunjukNotifikasi(
-        'Syarat Ilmu Tidak Cukup',
-        `Memerlukan Ilmu Ketenteraan Lvl ${bp.reqSkillWar} & Kejuruteraan Lvl ${bp.reqSkillEng}!`
-      );
-      return;
-    }
-
-    const materialDiscount = 1 - (passives.cekapBahan * 1.5) / 100;
-    const finalAmount = Math.max(1, Math.floor(bp.trainingCost.amount * materialDiscount));
-    const reqRes = bp.trainingCost.resource;
-
-    if ((playerWarehouse[reqRes] || 0) < finalAmount || wang < bp.trainingCost.gold) {
-      tunjukNotifikasi('Sumber Kurang', 'Semak baki gudang dan simpanan emas anda.');
-      return;
-    }
-
-    setPlayerWarehouse((prev) => ({ ...prev, [reqRes]: prev[reqRes] - finalAmount }));
-    setWang((w) => w - bp.trainingCost.gold);
-    setPlayerBarracks((prev) => {
-      const u = { ...prev.units, [unitType]: (prev.units[unitType] || 0) + 1 };
-      return { ...prev, units: u, totalMilitaryPower: calculateMilitaryPower(u, disciplines.ilmuKetenteraan) };
-    });
-    tunjukNotifikasi('Latihan Selesai', `1x ${bp.name} siap ditugaskan!`);
-  };
-
-  const handleSendTroops = (campaignId: string, side: 'ATTACK' | 'DEFENSE', power: number, warCategory: WarType) => {
-    if (power <= 0) return;
-    const critBonus = 1 + (passives.semangatWaja * 1.2) / 100;
-    const finalPower = Math.floor(power * critBonus);
-
-    const expGained = Math.floor(120 + disciplines.ilmuKetenteraan * 2.5);
-    const goldGained = Math.floor(5000 + disciplines.ilmuFirasat * 50);
-    const result = LevelSystem.addXp(tahap, xp, expGained, wang + goldGained);
-    setTahap(result.newLevel);
-    setXp(result.newXp);
-    setWang(result.newGold);
-
-    tunjukNotifikasi('Gempuran Berjaya!', `+${finalPower.toLocaleString()} DMG disumbangkan! (+${expGained} EXP, +$${goldGained.toLocaleString()} RM).`);
-  };
-
   const handleWorkInFactory = (factoryId: string) => {
     const WORK_COOLDOWN_MS = 10 * 60 * 1000;
     const currentMs = Date.now();
@@ -693,7 +637,7 @@ export default function App() {
             onQuickWork={() => {
               if (senaraiKilang.length > 0) handleWorkInFactory(senaraiKilang[0].id);
             }}
-            onQuickTrain={() => handleTrainUnit('INFANTRI')}
+            onQuickTrain={() => {}}
             onSendChatMessage={(msg, channel) => console.log(`[Chat #${channel}] ${msg}`)}
           />
         </ScrollView>
@@ -833,7 +777,7 @@ export default function App() {
           realWarCampaigns={realWars}
           playerBarracks={playerBarracks}
           playerGold={wang}
-          onSendTroops={handleSendTroops}
+          onSendTroops={() => {}}
           onOpenBarracks={() => setTabAktif('berek')}
         />
       ) : tabAktif === 'berek' ? (
