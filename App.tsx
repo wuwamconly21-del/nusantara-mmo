@@ -287,11 +287,12 @@ export default function App() {
     playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
-  // FUNGSI SYNC & UPSERT KE SUPABASE MENGGUNAKAN KOLUM BM
+  // FUNGSI SYNC & UPSERT KE SUPABASE DENGAN ERROR CATCHING
   const syncUserData = async (user: any) => {
     if (user) {
+      console.log("ID Pemain Semasa:", user.id);
       setPemainId(user.id);
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (data) {
         setNamaPemain(data.username || 'Pendekar');
@@ -312,7 +313,10 @@ export default function App() {
           hp: 100,
           wilayah_id: 'Kuala Lumpur',
         };
-        await supabase.from('profiles').upsert([newProfile]);
+        const { error: upsertError } = await supabase.from('profiles').upsert([newProfile]);
+        if (upsertError) {
+          console.error('Ralat Upsert Profil:', upsertError.message);
+        }
         setNamaPemain(newProfile.username);
         setWang(1000);
         setNilam(1500);
@@ -339,7 +343,7 @@ export default function App() {
       return;
     }
     const newHp = Math.max(0, hp - 10);
-    const maxedLvl = Math.min(50, tahap); // Had tahap maksimum 50
+    const maxedLvl = Math.min(50, tahap);
     const result = LevelSystem.addXp(maxedLvl, xp, 50, wang + 1500);
     const newLevel = Math.min(50, result.newLevel);
     const newXp = result.newXp;
@@ -351,12 +355,18 @@ export default function App() {
     setWang(newGold);
 
     if (pemainId) {
-      await supabase.from('profiles').update({
+      const { error } = await supabase.from('profiles').update({
         tahap: newLevel,
         xp: newXp,
         baki_wang: newGold,
         hp: newHp,
       }).eq('id', pemainId);
+
+      if (error) {
+        console.error('Ralat Supabase Update:', error);
+        tunjukNotifikasi('Gagal Simpan', error.message);
+        return;
+      }
     }
 
     tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM disimpan ke pangkalan data!');
@@ -380,12 +390,18 @@ export default function App() {
     setWang(newGold);
 
     if (pemainId) {
-      await supabase.from('profiles').update({
+      const { error } = await supabase.from('profiles').update({
         tahap: newLevel,
         xp: newXp,
         baki_wang: newGold,
         hp: newHp,
       }).eq('id', pemainId);
+
+      if (error) {
+        console.error('Ralat Supabase Update:', error);
+        tunjukNotifikasi('Gagal Simpan', error.message);
+        return;
+      }
     }
 
     tunjukNotifikasi('Gempur Instant!', `Berjaya menyerang ${side}! (+150 EXP, +$2,500 RM)`);
@@ -597,7 +613,6 @@ export default function App() {
                 <Text style={styles.sectionHeaderTitle}>KILANG & INDUSTRI WILAYAH</Text>
                 <Text style={styles.cardDesc}>Jumlah kilang beroperasi: {senaraiKilang.length}</Text>
               </View>
-              {/* Pembinaan kilang ditutup */}
               <TouchableOpacity style={[styles.btnMiniGold, { opacity: 0.5 }]} onPress={() => tunjukNotifikasi('Disekat', 'Pembinaan kilang baru ditutup.')}>
                 <Plus size={14} color="#07060A" />
                 <Text style={styles.btnMiniGoldText}>+ BINA KILANG (TUTUP)</Text>
@@ -714,7 +729,7 @@ export default function App() {
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'perniagaan' && styles.bottomNavItemActive]} onPress={() => setTabAktif('perniagaan')}>
           <Factory size={18} color={tabAktif === 'perniagaan' ? '#F3CE65' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'perniagaan' && styles.bottomNavTextActive]}>Kilang</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'perniagaan' && styles.bottomNavItemActive]}>Kilang</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'gudang' && styles.bottomNavItemActive]} onPress={() => setTabAktif('gudang')}>
@@ -724,7 +739,7 @@ export default function App() {
 
         <TouchableOpacity style={[styles.bottomNavItem, tabAktif === 'profil' && styles.bottomNavItemActive]} onPress={() => setTabAktif('profil')}>
           <User size={18} color={tabAktif === 'profil' ? '#F3CE65' : '#777'} />
-          <Text style={[styles.bottomNavText, tabAktif === 'profil' && styles.bottomNavTextActive]}>Profil</Text>
+          <Text style={[styles.bottomNavText, tabAktif === 'profil' && styles.bottomNavItemActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
 
