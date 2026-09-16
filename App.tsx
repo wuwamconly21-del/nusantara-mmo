@@ -44,7 +44,7 @@ import { ParliamentView } from './src/components/Parliament/ParliamentView';
 import { TAKHTA_FACTORY_CATALOG } from './src/systems/FactoryCatalog';
 import { FactoryDetailView } from './src/components/FactoryDetailView';
 import { WarehouseView } from './src/components/WarehouseView';
-import { MILITARY_CATALOG, MilitaryUnitType, PlayerBarracks } from './src/types/military';
+import { PlayerBarracks } from './src/types/military';
 import { WarHubView } from './src/components/WarHubView';
 import { CustomWarCampaign } from './src/types/military';
 import { DetailedProfileView } from './src/components/DetailedProfileView';
@@ -227,7 +227,7 @@ export default function App() {
   const [xp, setXp] = useState(0);
   const [hp, setHp] = useState(100);
   const [wang, setWang] = useState(6050);
-  const [nilam, setNilam] = useState(0);
+  const [nilam, setNilam] = useState(1500); // 1500 Diamond bonus permulaan
 
   const [disciplines, setDisciplines] = useState<PlayerDisciplines>({
     ilmuKetenteraan: 1,
@@ -263,10 +263,10 @@ export default function App() {
     timeRemaining: '04:12:30',
   });
 
-  const [senaraiKilang, setSenaraiKilang] = useState<AdvancedFactoryData[]>([]);
+  const [senaraiKilang] = useState<AdvancedFactoryData[]>([]);
   const [selectedFactoryId] = useState<string | null>(null);
-  const [modalBinaKilang, setModalBinaKilang] = useState(false);
-  const [kilangDipilih, setKilangDipilih] = useState<string>('Kilang Berlian');
+  const [modalBinaKilang] = useState(false);
+  const [kilangDipilih] = useState<string>('Kilang Berlian');
 
   const [userPartyId, setUserPartyId] = useState<string | null>(null);
   const [detailedParties] = useState<DetailedParty[]>([]);
@@ -287,28 +287,43 @@ export default function App() {
     playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
-  // SEMAK ATAU BERI 1500 DIAMOND PERTAMA KALI (SEKALI SAHAJA)
+  // FUNGSI SYNC DATA DISARING MENGIKUT NAMA KOLUM SUPABASE BAHASA MELAYU
   const syncUserData = async (user: any) => {
     if (user) {
       setPemainId(user.id);
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (data) {
-        setNamaPemain(data.username);
-        setWang(data.gold || 1000);
-        setTahap(data.level || 1);
-        setNilam(data.gems !== undefined ? data.gems : 1500); // Pastikan dapat 1500 diamond
+        setNamaPemain(data.username || 'Pendekar');
+        setWang(data.baki_wang ?? 1000);
+        setNilam(data.permata_nilam ?? 1500);
+        setTahap(data.tahap ?? 1);
+        setXp(data.xp ?? 0);
+        setHp(data.hp ?? 100);
+        if (data.wilayah_id) setWilayahSemasa(data.wilayah_id);
       } else {
-        // Jika profil belum wujud dalam table, cipta baru dengan 1500 diamond
-        await supabase.from('profiles').upsert([
-          { id: user.id, username: user.user_metadata?.username || 'Pendekar', gold: 1000, gems: 1500, level: 1 }
-        ]);
+        // Pendaftaran pertama: Masukkan terus 1500 permata nilam sekali seumur hidup
+        const newProfile = {
+          id: user.id,
+          username: user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar',
+          baki_wang: 1000,
+          permata_nilam: 1500,
+          tahap: 1,
+          xp: 0,
+          hp: 100,
+          wilayah_id: 'Kuala Lumpur',
+        };
+        await supabase.from('profiles').upsert([newProfile]);
+        setNamaPemain(newProfile.username);
+        setWang(1000);
         setNilam(1500);
+        setTahap(1);
+        setXp(0);
+        setHp(100);
       }
     } else {
       setPemainId(null);
       setNamaPemain('Tetamu (Guest)');
-      setNilam(0);
     }
   };
 
@@ -319,31 +334,62 @@ export default function App() {
     tunjukNotifikasi('Log Keluar', 'Anda kini bermain sebagai Tetamu.');
   };
 
-  const handleWorkInFactory = () => {
+  // KERJA DI KILANG (AUTO-SAVE KE KOLUM SUPABASE BM)
+  const handleWorkInFactory = async () => {
     if (hp < 10) {
       tunjukNotifikasi('Tenaga Lemah', 'Memerlukan sekurang-kurangnya 10 HP!');
       return;
     }
-    setHp((h) => Math.max(0, h - 10));
-    // Had tahap dinaikkan maksimum 50
-    const nextLevelTahap = Math.min(50, tahap);
-    const result = LevelSystem.addXp(nextLevelTahap, xp, 50, wang + 1500);
-    setTahap(Math.min(50, result.newLevel));
-    setXp(result.newXp);
-    setWang(result.newGold);
-    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM ditambah!');
+    const newHp = Math.max(0, hp - 10);
+    const maxedLvl = Math.min(50, tahap); // Had tahap maksimum 50
+    const result = LevelSystem.addXp(maxedLvl, xp, 50, wang + 1500);
+    const newLevel = Math.min(50, result.newLevel);
+    const newXp = result.newXp;
+    const newGold = result.newGold;
+
+    setHp(newHp);
+    setTahap(newLevel);
+    setXp(newXp);
+    setWang(newGold);
+
+    if (pemainId) {
+      await supabase.from('profiles').update({
+        tahap: newLevel,
+        xp: newXp,
+        baki_wang: newGold,
+        hp: newHp,
+      }).eq('id', pemainId);
+    }
+
+    tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM disimpan ke pangkalan data!');
   };
 
-  const handleSendTroops = (campaignId: string, side: string) => {
+  const handleSendTroops = async (campaignId: string, side: string) => {
     if (hp < 15) {
       tunjukNotifikasi('Tenaga Kurang', 'Perlu 15 HP untuk menyerang!');
       return;
     }
-    setHp((h) => Math.max(0, h - 15));
-    const result = LevelSystem.addXp(Math.min(50, tahap), xp, 150, wang + 2500);
-    setTahap(Math.min(50, result.newLevel));
-    setXp(result.newXp);
-    setWang(result.newGold);
+    const newHp = Math.max(0, hp - 15);
+    const maxedLvl = Math.min(50, tahap);
+    const result = LevelSystem.addXp(maxedLvl, xp, 150, wang + 2500);
+    const newLevel = Math.min(50, result.newLevel);
+    const newXp = result.newXp;
+    const newGold = result.newGold;
+
+    setHp(newHp);
+    setTahap(newLevel);
+    setXp(newXp);
+    setWang(newGold);
+
+    if (pemainId) {
+      await supabase.from('profiles').update({
+        tahap: newLevel,
+        xp: newXp,
+        baki_wang: newGold,
+        hp: newHp,
+      }).eq('id', pemainId);
+    }
+
     tunjukNotifikasi('Gempur Instant!', `Berjaya menyerang ${side}! (+150 EXP, +$2,500 RM)`);
   };
 
@@ -384,7 +430,7 @@ export default function App() {
     tunjukNotifikasi('Mula Bertapa', `Latihan dimulakan! Baki masa: ${DisciplineEngine.formatTime(durationSecs)}.`);
   };
 
-  const handleCompleteStudy = () => {
+  const handleCompleteStudy = async () => {
     if (!activeStudySession) return;
     const key = activeStudySession.disciplineKey;
     const targetLvl = activeStudySession.targetLevel;
@@ -553,8 +599,8 @@ export default function App() {
                 <Text style={styles.sectionHeaderTitle}>KILANG & INDUSTRI WILAYAH</Text>
                 <Text style={styles.cardDesc}>Jumlah kilang beroperasi: {senaraiKilang.length}</Text>
               </View>
-              {/* Kilang baru tidak dibenarkan dicipta */}
-              <TouchableOpacity style={[styles.btnMiniGold, { opacity: 0.5 }]} onPress={() => tunjukNotifikasi('Disekat', 'Pembinaan kilang baru ditutup buat masa ini.')}>
+              {/* Pembinaan kilang ditutup */}
+              <TouchableOpacity style={[styles.btnMiniGold, { opacity: 0.5 }]} onPress={() => tunjukNotifikasi('Disekat', 'Pembinaan kilang baru ditutup.')}>
                 <Plus size={14} color="#07060A" />
                 <Text style={styles.btnMiniGoldText}>+ BINA KILANG (TUTUP)</Text>
               </TouchableOpacity>
@@ -609,7 +655,7 @@ export default function App() {
           parties={detailedParties}
           playerGold={wang}
           onApplyParty={(partyId) => setUserPartyId(partyId)}
-          onCreateParty={() => tunjukNotifikasi('Disekat', 'Penciptaan parti politik baru telah ditutup.')} // Parti dilarang cipta
+          onCreateParty={() => tunjukNotifikasi('Disekat', 'Penciptaan parti politik baru ditutup.')}
           onDonateGold={() => {}}
           onLeaveParty={() => setUserPartyId(null)}
           onBack={() => setTabAktif('utama')}
@@ -701,7 +747,6 @@ export default function App() {
         }}
       />
 
-      {/* VISA DOKUMEN MODAL */}
       <VisaStatusModal
         visible={isVisaModalOpen}
         playerName={namaPemain}
