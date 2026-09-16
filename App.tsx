@@ -239,14 +239,7 @@ export default function App() {
 
   const [activeStudySession, setActiveStudySession] = useState<ActiveStudySession | null>(null);
   const [passives] = useState<PassiveTalents>({
-    pengaruhDaulat: 0,
-    pakarUpeti: 0,
-    langkahPantas: 0,
-    gedungSaujana: 0,
-    ketahananBatin: 0,
-    cekapBahan: 0,
-    bungaWang: 0,
-    semangatWaja: 0,
+    pengaruhDaulat: 0, pakarUpeti: 0, langkahPantas: 0, gedungSaujana: 0, ketahananBatin: 0, cekapBahan: 0, bungaWang: 0, semangatWaja: 0,
   });
   const [passivePoints, setPassivePoints] = useState<number>(0);
 
@@ -294,21 +287,28 @@ export default function App() {
     playerId: 'PLAYER_01', savingsBalance: 0, activeLoanAmount: 0, loanDueTimestamp: 0, ownedShares: [],
   });
 
-  const syncUserData = (user: any) => {
+  // SEMAK ATAU BERI 1500 DIAMOND PERTAMA KALI (SEKALI SAHAJA)
+  const syncUserData = async (user: any) => {
     if (user) {
       setPemainId(user.id);
-      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
-        if (data) {
-          setNamaPemain(data.username);
-          setWang(data.gold || 1000);
-          setTahap(data.level || 1);
-        } else {
-          setNamaPemain(user.user_metadata?.username || user.email?.split('@')[0] || 'Pendekar');
-        }
-      });
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      
+      if (data) {
+        setNamaPemain(data.username);
+        setWang(data.gold || 1000);
+        setTahap(data.level || 1);
+        setNilam(data.gems !== undefined ? data.gems : 1500); // Pastikan dapat 1500 diamond
+      } else {
+        // Jika profil belum wujud dalam table, cipta baru dengan 1500 diamond
+        await supabase.from('profiles').upsert([
+          { id: user.id, username: user.user_metadata?.username || 'Pendekar', gold: 1000, gems: 1500, level: 1 }
+        ]);
+        setNilam(1500);
+      }
     } else {
       setPemainId(null);
       setNamaPemain('Tetamu (Guest)');
+      setNilam(0);
     }
   };
 
@@ -325,8 +325,10 @@ export default function App() {
       return;
     }
     setHp((h) => Math.max(0, h - 10));
-    const result = LevelSystem.addXp(tahap, xp, 50, wang + 1500);
-    setTahap(result.newLevel);
+    // Had tahap dinaikkan maksimum 50
+    const nextLevelTahap = Math.min(50, tahap);
+    const result = LevelSystem.addXp(nextLevelTahap, xp, 50, wang + 1500);
+    setTahap(Math.min(50, result.newLevel));
     setXp(result.newXp);
     setWang(result.newGold);
     tunjukNotifikasi('Kerja Berjaya', '+50 EXP & +$1,500 RM ditambah!');
@@ -338,8 +340,8 @@ export default function App() {
       return;
     }
     setHp((h) => Math.max(0, h - 15));
-    const result = LevelSystem.addXp(tahap, xp, 150, wang + 2500);
-    setTahap(result.newLevel);
+    const result = LevelSystem.addXp(Math.min(50, tahap), xp, 150, wang + 2500);
+    setTahap(Math.min(50, result.newLevel));
     setXp(result.newXp);
     setWang(result.newGold);
     tunjukNotifikasi('Gempur Instant!', `Berjaya menyerang ${side}! (+150 EXP, +$2,500 RM)`);
@@ -551,9 +553,10 @@ export default function App() {
                 <Text style={styles.sectionHeaderTitle}>KILANG & INDUSTRI WILAYAH</Text>
                 <Text style={styles.cardDesc}>Jumlah kilang beroperasi: {senaraiKilang.length}</Text>
               </View>
-              <TouchableOpacity style={styles.btnMiniGold} onPress={() => setModalBinaKilang(true)}>
+              {/* Kilang baru tidak dibenarkan dicipta */}
+              <TouchableOpacity style={[styles.btnMiniGold, { opacity: 0.5 }]} onPress={() => tunjukNotifikasi('Disekat', 'Pembinaan kilang baru ditutup buat masa ini.')}>
                 <Plus size={14} color="#07060A" />
-                <Text style={styles.btnMiniGoldText}>+ BINA KILANG</Text>
+                <Text style={styles.btnMiniGoldText}>+ BINA KILANG (TUTUP)</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -606,7 +609,7 @@ export default function App() {
           parties={detailedParties}
           playerGold={wang}
           onApplyParty={(partyId) => setUserPartyId(partyId)}
-          onCreateParty={() => {}}
+          onCreateParty={() => tunjukNotifikasi('Disekat', 'Penciptaan parti politik baru telah ditutup.')} // Parti dilarang cipta
           onDonateGold={() => {}}
           onLeaveParty={() => setUserPartyId(null)}
           onBack={() => setTabAktif('utama')}
@@ -681,7 +684,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* AUTH & CLASS SELECTION MODAL */}
       <AuthModal
         visible={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
@@ -698,64 +700,6 @@ export default function App() {
           tunjukNotifikasi('Haluan Dipilih', `Selamat berjuang sebagai seorang ${className}!`);
         }}
       />
-
-      {/* MODAL BINA KILANG */}
-      <Modal visible={modalBinaKilang} animationType="fade" transparent={true}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalBox}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionHeaderTitle}>BINA KILANG BARU</Text>
-              <TouchableOpacity onPress={() => setModalBinaKilang(false)}>
-                <Text style={{ color: '#888', fontWeight: 'bold' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
-              {Object.keys(TAKHTA_FACTORY_CATALOG).map((fName) => {
-                const item = TAKHTA_FACTORY_CATALOG[fName];
-                const isSelected = kilangDipilih === fName;
-                return (
-                  <TouchableOpacity key={item.id} style={[styles.catalogItem, isSelected && styles.catalogItemActive]} onPress={() => setKilangDipilih(fName)}>
-                    <Text style={[styles.whiteBold, isSelected && { color: '#F3CE65' }]}>{item.name}</Text>
-                    <Text style={styles.goldSmall}>${item.buildCostRM.toLocaleString()}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.btnTravel} onPress={() => {
-              const bp = TAKHTA_FACTORY_CATALOG[kilangDipilih];
-              if (wang < bp.buildCostRM) {
-                tunjukNotifikasi('Dana Kurang', 'Wang tidak mencukupi.');
-                return;
-              }
-              const newFac: AdvancedFactoryData = {
-                id: `FAC_${Date.now()}`,
-                name: `${bp.name} ${wilayahSemasa}`,
-                factoryType: bp.name,
-                resourceId: bp.resourceId,
-                level: 1,
-                ownerId: pemainId || 'PLAYER_01',
-                ownerName: namaPemain,
-                regionId: wilayahSemasa,
-                regionName: wilayahSemasa,
-                stateName: negaraSemasa,
-                wageType: 'PERCENTAGE',
-                wageRate: 100,
-                treasury: 5000,
-                workerCount: 0,
-                maxWorkers: 10,
-                stock: 50,
-                isWorkingHere: false,
-              };
-              setWang((w) => w - bp.buildCostRM);
-              setSenaraiKilang((prev) => [newFac, ...prev]);
-              setModalBinaKilang(false);
-              tunjukNotifikasi('Berjaya', 'Kilang didirikan!');
-            }}>
-              <Text style={styles.btnTravelTxt}>SAHKAN & BINA KILANG</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* VISA DOKUMEN MODAL */}
       <VisaStatusModal
